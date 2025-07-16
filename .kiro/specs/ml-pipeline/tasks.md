@@ -7,33 +7,33 @@
   - _Requirements: 6.1, 6.2_
 
 - [ ] 2. Implement configuration management system
-  - [ ] 2.1 Create configuration schema validation
+  - [x] 2.1 Create configuration schema validation
     - Write Pydantic models for pipeline configuration schema
     - Implement YAML/JSON schema validation with detailed error messages
     - Create unit tests for configuration validation edge cases
     - _Requirements: 6.1, 6.4_
   
-  - [ ] 2.2 Implement configuration loading and variable substitution
+  - [x] 2.2 Implement configuration loading and variable substitution
     - Code ConfigManager class with environment variable substitution
     - Add support for configuration inheritance and default values
     - Write tests for variable resolution and configuration merging
     - _Requirements: 6.2, 6.3_
 
 - [ ] 3. Build core pipeline orchestration engine
-  - [ ] 3.1 Implement pipeline orchestrator base class
+  - [x] 3.1 Implement pipeline orchestrator base class
     - Create PipelineOrchestrator with stage execution logic
     - Implement component registry for dynamic component loading
     - Add structured logging with correlation IDs and timestamps
     - _Requirements: 9.1, 9.2_
   
-  - [ ] 3.2 Add error handling and recovery mechanisms
+  - [x] 3.2 Add error handling and recovery mechanisms
     - Implement error classification and recovery strategies
     - Add checkpointing functionality for pipeline resumption
     - Create comprehensive error reporting with context information
     - _Requirements: 9.2, 9.4_
 
 - [ ] 4. Implement data ingestion and preprocessing
-  - [ ] 4.1 Create data source connectors
+  - [-] 4.1 Create data source connectors
     - Write adapters for CSV, JSON, Parquet, and SQL database sources
     - Implement data schema validation and type checking
     - Add connection pooling and authentication support
