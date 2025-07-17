@@ -1,0 +1,135 @@
+{
+  "study_name": "hyperopt_20250717_124809",
+  "direction": "MAXIMIZE",
+  "best_trial": {
+    "number": 0,
+    "value": 0.9371690938214544,
+    "params": {
+      "n_estimators": 66,
+      "max_depth": 6,
+      "min_samples_split": 3
+    }
+  },
+  "trials": [
+    {
+      "number": 0,
+      "value": 0.9371690938214544,
+      "params": {
+        "n_estimators": 66,
+        "max_depth": 6,
+        "min_samples_split": 3
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:09.562776",
+      "datetime_complete": "2025-07-17T12:48:09.725026"
+    },
+    {
+      "number": 1,
+      "value": 0.9000097819840308,
+      "params": {
+        "n_estimators": 16,
+        "max_depth": 12,
+        "min_samples_split": 9
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:09.725171",
+      "datetime_complete": "2025-07-17T12:48:09.767507"
+    },
+    {
+      "number": 2,
+      "value": 0.925718058765269,
+      "params": {
+        "n_estimators": 100,
+        "max_depth": 9,
+        "min_samples_split": 5
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:09.767605",
+      "datetime_complete": "2025-07-17T12:48:10.006711"
+    },
+    {
+      "number": 3,
+      "value": 0.9028465573529951,
+      "params": {
+        "n_estimators": 11,
+        "max_depth": 10,
+        "min_samples_split": 5
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.006807",
+      "datetime_complete": "2025-07-17T12:48:10.037850"
+    },
+    {
+      "number": 4,
+      "value": 0.912836408544563,
+      "params": {
+        "n_estimators": 39,
+        "max_depth": 11,
+        "min_samples_split": 2
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.037973",
+      "datetime_complete": "2025-07-17T12:48:10.136322"
+    },
+    {
+      "number": 5,
+      "value": 0.9128608635046404,
+      "params": {
+        "n_estimators": 52,
+        "max_depth": 13,
+        "min_samples_split": 4
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.136448",
+      "datetime_complete": "2025-07-17T12:48:10.265261"
+    },
+    {
+      "number": 6,
+      "value": 0.9171160265580866,
+      "params": {
+        "n_estimators": 83,
+        "max_depth": 15,
+        "min_samples_split": 5
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.265416",
+      "datetime_complete": "2025-07-17T12:48:10.470648"
+    },
+    {
+      "number": 7,
+      "value": 0.9157587762737976,
+      "params": {
+        "n_estimators": 58,
+        "max_depth": 7,
+        "min_samples_split": 10
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.470769",
+      "datetime_complete": "2025-07-17T12:48:10.612736"
+    },
+    {
+      "number": 8,
+      "value": 0.9000097819840308,
+      "params": {
+        "n_estimators": 88,
+        "max_depth": 15,
+        "min_samples_split": 4
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.612865",
+      "datetime_complete": "2025-07-17T12:48:10.833869"
+    },
+    {
+      "number": 9,
+      "value": 0.9228873971363242,
+      "params": {
+        "n_estimators": 44,
+        "max_depth": 9,
+        "min_samples_split": 8
+      },
+      "state": "COMPLETE",
+      "datetime_start": "2025-07-17T12:48:10.833992",
+      "datetime_complete": "2025-07-17T12:48:10.951913"
+    }
+  ]
+}

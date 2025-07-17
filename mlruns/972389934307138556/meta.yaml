@@ -1,0 +1,6 @@
+artifact_location: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556
+creation_time: 1752781689549
+experiment_id: '972389934307138556'
+last_update_time: 1752781689549
+lifecycle_stage: active
+name: ml-pipeline-hyperopt-example

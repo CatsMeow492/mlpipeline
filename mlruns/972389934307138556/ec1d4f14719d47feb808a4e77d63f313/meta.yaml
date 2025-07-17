@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/ec1d4f14719d47feb808a4e77d63f313/artifacts
+end_time: 1752781691083
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: ec1d4f14719d47feb808a4e77d63f313
+run_name: nervous-swan-551
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691073
+status: 3
+tags: []
+user_id: taylormohney

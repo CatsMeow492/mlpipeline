@@ -2,6 +2,12 @@
 
 from .ingestion import DataIngestionEngine
 from .preprocessing import DataPreprocessor
-from .validation import DataValidator
+from .versioning import DataVersionManager, DVCManager, DataVersioningIntegrator
 
-__all__ = ["DataIngestionEngine", "DataPreprocessor", "DataValidator"]
+__all__ = [
+    "DataIngestionEngine", 
+    "DataPreprocessor", 
+    "DataVersionManager", 
+    "DVCManager", 
+    "DataVersioningIntegrator"
+]

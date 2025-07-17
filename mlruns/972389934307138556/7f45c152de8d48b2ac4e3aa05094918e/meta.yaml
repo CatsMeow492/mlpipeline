@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/7f45c152de8d48b2ac4e3aa05094918e/artifacts
+end_time: 1752781691095
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: 7f45c152de8d48b2ac4e3aa05094918e
+run_name: agreeable-perch-976
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691085
+status: 3
+tags: []
+user_id: taylormohney

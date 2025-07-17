@@ -1,0 +1,6 @@
+artifact_location: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/771671356505938677
+creation_time: 1752781689315
+experiment_id: '771671356505938677'
+last_update_time: 1752781689315
+lifecycle_stage: active
+name: ml-pipeline-training-example

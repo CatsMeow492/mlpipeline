@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/61c400256f4b403f8c7e756e31d67466/artifacts
+end_time: 1752781691140
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: 61c400256f4b403f8c7e756e31d67466
+run_name: nosy-sheep-261
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691130
+status: 3
+tags: []
+user_id: taylormohney

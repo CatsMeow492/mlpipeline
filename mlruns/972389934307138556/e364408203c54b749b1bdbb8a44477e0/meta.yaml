@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/e364408203c54b749b1bdbb8a44477e0/artifacts
+end_time: 1752781691106
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: e364408203c54b749b1bdbb8a44477e0
+run_name: trusting-flea-889
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691096
+status: 3
+tags: []
+user_id: taylormohney

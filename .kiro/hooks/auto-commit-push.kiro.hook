@@ -4,7 +4,7 @@
   "description": "Automatically commits and pushes changes to git repository when Python files, setup files, or documentation are modified",
   "version": "1",
   "when": {
-    "type": "fileEdited",
+    "type": "userTriggered",
     "patterns": [
       "./",
       "./*"

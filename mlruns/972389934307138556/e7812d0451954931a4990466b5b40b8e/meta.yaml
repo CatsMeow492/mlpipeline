@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/e7812d0451954931a4990466b5b40b8e/artifacts
+end_time: 1752781691160
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: e7812d0451954931a4990466b5b40b8e
+run_name: kindly-croc-72
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691152
+status: 3
+tags: []
+user_id: taylormohney

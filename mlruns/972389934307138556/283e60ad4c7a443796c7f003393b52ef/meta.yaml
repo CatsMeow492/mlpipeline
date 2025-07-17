@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/283e60ad4c7a443796c7f003393b52ef/artifacts
+end_time: 1752781691196
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: 283e60ad4c7a443796c7f003393b52ef
+run_name: hyperopt_20250717_124809
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781689552
+status: 3
+tags: []
+user_id: taylormohney

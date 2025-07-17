@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/972389934307138556/b6ef5f17898e462ebc17f36837e00879/artifacts
+end_time: 1752781691150
+entry_point_name: ''
+experiment_id: '972389934307138556'
+lifecycle_stage: active
+run_id: b6ef5f17898e462ebc17f36837e00879
+run_name: chill-grub-153
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691141
+status: 3
+tags: []
+user_id: taylormohney

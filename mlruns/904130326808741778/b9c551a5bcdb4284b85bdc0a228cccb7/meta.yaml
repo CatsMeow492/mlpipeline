@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/taylormohney/Documents/GitHub/mlpipeline/mlruns/904130326808741778/b9c551a5bcdb4284b85bdc0a228cccb7/artifacts
+end_time: 1752781691404
+entry_point_name: ''
+experiment_id: '904130326808741778'
+lifecycle_stage: active
+run_id: b9c551a5bcdb4284b85bdc0a228cccb7
+run_name: comparison_run_2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1752781691395
+status: 3
+tags: []
+user_id: taylormohney

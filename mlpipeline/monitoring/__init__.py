@@ -1,7 +1,22 @@
 """Monitoring and drift detection components."""
 
-from .drift import DriftDetector
-from .alerts import AlertManager
-from .metrics import MetricsCollector
+from .drift_detection import DriftDetector, DriftMonitor
+from .alerts import (
+    Alert,
+    AlertRule,
+    AlertManager,
+    EmailAlertChannel,
+    SlackAlertChannel,
+    WebhookAlertChannel,
+)
 
-__all__ = ["DriftDetector", "AlertManager", "MetricsCollector"]
+__all__ = [
+    "DriftDetector", 
+    "DriftMonitor",
+    "Alert",
+    "AlertRule", 
+    "AlertManager",
+    "EmailAlertChannel",
+    "SlackAlertChannel", 
+    "WebhookAlertChannel",
+]
