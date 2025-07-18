@@ -1,0 +1,16 @@
+# GPU-specific dependencies
+# PyTorch with CUDA support
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# GPU monitoring (lightweight)
+nvidia-ml-py>=12.0.0
+pynvml>=11.5.0
+
+# Note: CUDA-accelerated libraries like cupy and rapids
+# are commented out to avoid build issues in environments
+# without proper CUDA setup. Uncomment if needed:
+# cupy-cuda11x>=12.0.0
+# rapids-cudf>=23.06
+# rapids-cuml>=23.06

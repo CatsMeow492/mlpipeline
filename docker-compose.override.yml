@@ -1,0 +1,24 @@
+# Docker Compose override for local development
+# This file is automatically loaded by docker-compose
+
+version: '3.8'
+
+services:
+  mlpipeline-dev:
+    volumes:
+      # Mount source code for live development
+      - .:/app
+      # Preserve Python cache
+      - /app/__pycache__
+      - /app/.pytest_cache
+    environment:
+      # Development-specific environment variables
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    # Enable hot reloading for development
+    command: >
+      bash -c "
+        pip install -e . &&
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=mlpipeline-dev-token
+      "

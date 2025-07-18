@@ -129,6 +129,10 @@ class NetworkError(PipelineError):
         super().__init__(message, ErrorCategory.NETWORK, severity, context)
 
 
+# Alias for backward compatibility and distributed computing modules
+MLPipelineError = PipelineError
+
+
 class ErrorHandler:
     """Handles error classification, recovery, and reporting."""
     

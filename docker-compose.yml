@@ -1,0 +1,268 @@
+version: '3.8'
+
+services:
+  # Main ML Pipeline service
+  mlpipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mlpipeline-app
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+      - mlflow-artifacts:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+    depends_on:
+      - postgres
+      - mlflow
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+
+  # GPU-enabled ML Pipeline service
+  mlpipeline-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production-gpu
+    container_name: mlpipeline-gpu-app
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+      - mlflow-artifacts:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+      - CUDA_VISIBLE_DEVICES=0
+    depends_on:
+      - postgres
+      - mlflow
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles:
+      - gpu
+
+  # Development environment with Jupyter
+  mlpipeline-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: mlpipeline-dev
+    ports:
+      - "8888:8888"
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - jupyter-data:/home/mlpipeline/.jupyter
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=mlpipeline-dev-token
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+    depends_on:
+      - postgres
+      - mlflow
+    networks:
+      - mlpipeline-network
+    profiles:
+      - development
+
+  # MLflow tracking server
+  mlflow:
+    image: python:3.11-slim
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql://mlpipeline:mlpipeline123@postgres:5432/mlflow
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    command: >
+      bash -c "
+        pip install mlflow psycopg2-binary &&
+        mlflow server 
+        --backend-store-uri postgresql://mlpipeline:mlpipeline123@postgres:5432/mlflow
+        --default-artifact-root /mlflow/artifacts
+        --host 0.0.0.0
+        --port 5000
+      "
+    depends_on:
+      - postgres
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mlpipeline-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlpipeline -d mlpipeline"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and task queues
+  redis:
+    image: redis:7-alpine
+    container_name: mlpipeline-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mlpipeline-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mlpipeline-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Dask Scheduler for distributed computing
+  dask-scheduler:
+    image: daskdev/dask:latest
+    container_name: mlpipeline-dask-scheduler
+    ports:
+      - "8786:8786"  # Scheduler port
+      - "8787:8787"  # Dashboard port
+    command: ["dask-scheduler"]
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    profiles:
+      - distributed
+
+  # Dask Worker
+  dask-worker:
+    image: daskdev/dask:latest
+    command: ["dask-worker", "dask-scheduler:8786"]
+    depends_on:
+      - dask-scheduler
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    profiles:
+      - distributed
+    deploy:
+      replicas: 2
+
+  # Ray Head Node
+  ray-head:
+    image: rayproject/ray:latest
+    container_name: mlpipeline-ray-head
+    ports:
+      - "8265:8265"  # Dashboard port
+      - "10001:10001"  # Client port
+    command: >
+      bash -c "
+        ray start --head --dashboard-host=0.0.0.0 --dashboard-port=8265 --port=10001 --block
+      "
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    profiles:
+      - distributed
+
+  # Ray Worker Node
+  ray-worker:
+    image: rayproject/ray:latest
+    command: >
+      bash -c "
+        ray start --address=ray-head:10001 --block
+      "
+    depends_on:
+      - ray-head
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    profiles:
+      - distributed
+    deploy:
+      replicas: 2
+
+volumes:
+  postgres-data:
+  mlflow-artifacts:
+  jupyter-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  mlpipeline-network:
+    driver: bridge

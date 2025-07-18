@@ -1,0 +1,344 @@
+version: '3.8'
+
+services:
+  # ML Pipeline with distributed computing support
+  mlpipeline-distributed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mlpipeline-distributed
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+      - mlflow-artifacts:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+      - DASK_SCHEDULER_ADDRESS=dask-scheduler:8786
+      - RAY_ADDRESS=ray-head:10001
+      - DISTRIBUTED_BACKEND=dask
+    depends_on:
+      - postgres
+      - mlflow
+      - dask-scheduler
+      - ray-head
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+
+  # GPU-enabled ML Pipeline with distributed computing
+  mlpipeline-distributed-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production-gpu
+    container_name: mlpipeline-distributed-gpu
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+      - mlflow-artifacts:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+      - DASK_SCHEDULER_ADDRESS=dask-scheduler:8786
+      - RAY_ADDRESS=ray-head:10001
+      - DISTRIBUTED_BACKEND=ray
+      - CUDA_VISIBLE_DEVICES=0
+    depends_on:
+      - postgres
+      - mlflow
+      - dask-scheduler
+      - ray-head
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles:
+      - gpu
+
+  # Dask Scheduler with resource management
+  dask-scheduler:
+    image: daskdev/dask:latest
+    container_name: mlpipeline-dask-scheduler
+    ports:
+      - "8786:8786"  # Scheduler port
+      - "8787:8787"  # Dashboard port
+    command: >
+      bash -c "
+        dask-scheduler --host 0.0.0.0 --port 8786 --dashboard-address 0.0.0.0:8787
+      "
+    environment:
+      - DASK_DISTRIBUTED__WORKER__MEMORY__TARGET=0.8
+      - DASK_DISTRIBUTED__WORKER__MEMORY__SPILL=0.9
+      - DASK_DISTRIBUTED__WORKER__MEMORY__PAUSE=0.95
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8787/status')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dask Workers (CPU)
+  dask-worker-cpu:
+    image: daskdev/dask:latest
+    command: >
+      bash -c "
+        dask-worker dask-scheduler:8786 --nthreads 2 --memory-limit 2GB --name worker-cpu-$$HOSTNAME
+      "
+    depends_on:
+      - dask-scheduler
+    environment:
+      - DASK_DISTRIBUTED__WORKER__MEMORY__TARGET=0.8
+      - DASK_DISTRIBUTED__WORKER__MEMORY__SPILL=0.9
+      - DASK_DISTRIBUTED__WORKER__MEMORY__PAUSE=0.95
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+  # Dask Workers (GPU)
+  dask-worker-gpu:
+    image: daskdev/dask:latest
+    command: >
+      bash -c "
+        pip install cupy-cuda11x &&
+        dask-worker dask-scheduler:8786 --nthreads 1 --memory-limit 4GB --name worker-gpu-$$HOSTNAME --resources 'GPU=1'
+      "
+    depends_on:
+      - dask-scheduler
+    environment:
+      - DASK_DISTRIBUTED__WORKER__MEMORY__TARGET=0.8
+      - DASK_DISTRIBUTED__WORKER__MEMORY__SPILL=0.9
+      - DASK_DISTRIBUTED__WORKER__MEMORY__PAUSE=0.95
+      - CUDA_VISIBLE_DEVICES=0
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+      replicas: 1
+    profiles:
+      - gpu
+
+  # Ray Head Node with enhanced configuration
+  ray-head:
+    image: rayproject/ray:latest
+    container_name: mlpipeline-ray-head
+    ports:
+      - "8265:8265"  # Dashboard port
+      - "10001:10001"  # Client port
+      - "8000:8000"   # Serve port
+    command: >
+      bash -c "
+        ray start --head 
+        --dashboard-host=0.0.0.0 
+        --dashboard-port=8265 
+        --num-cpus=2 
+        --memory=4000000000 
+        --object-store-memory=1000000000
+        --disable-usage-stats
+        --block
+      "
+    environment:
+      - RAY_DISABLE_IMPORT_WARNING=1
+      - RAY_memory_monitor_refresh_ms=0
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ray; ray.init('ray://localhost:10001'); print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ray Worker Nodes (CPU)
+  ray-worker-cpu:
+    image: rayproject/ray:latest
+    command: >
+      bash -c "
+        ray start 
+        --address=ray-head:10001 
+        --num-cpus=2 
+        --memory=2000000000 
+        --object-store-memory=500000000
+        --block
+      "
+    depends_on:
+      - ray-head
+    environment:
+      - RAY_DISABLE_IMPORT_WARNING=1
+      - RAY_memory_monitor_refresh_ms=0
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+  # Ray Worker Nodes (GPU)
+  ray-worker-gpu:
+    image: rayproject/ray:latest
+    command: >
+      bash -c "
+        ray start 
+        --address=ray-head:10001 
+        --num-cpus=2 
+        --num-gpus=1 
+        --memory=4000000000 
+        --object-store-memory=1000000000
+        --block
+      "
+    depends_on:
+      - ray-head
+    environment:
+      - RAY_DISABLE_IMPORT_WARNING=1
+      - RAY_memory_monitor_refresh_ms=0
+      - CUDA_VISIBLE_DEVICES=0
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+      replicas: 1
+    profiles:
+      - gpu
+
+  # Resource Monitor for distributed computing
+  resource-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mlpipeline-resource-monitor
+    command: >
+      bash -c "
+        python -c '
+        import time
+        from mlpipeline.distributed.resource_manager import ResourceManager
+        from mlpipeline.distributed.dask_backend import create_dask_backend
+        from mlpipeline.distributed.ray_backend import create_ray_backend
+        
+        rm = ResourceManager()
+        
+        # Register backends
+        dask_config = {\"scheduler_address\": \"dask-scheduler:8786\"}
+        ray_config = {\"ray_address\": \"ray-head:10001\"}
+        
+        try:
+            dask_backend = create_dask_backend(dask_config)
+            dask_backend.initialize()
+            rm.register_backend(\"dask\", dask_backend)
+        except Exception as e:
+            print(f\"Failed to initialize Dask: {e}\")
+        
+        try:
+            ray_backend = create_ray_backend(ray_config)
+            ray_backend.initialize()
+            rm.register_backend(\"ray\", ray_backend)
+        except Exception as e:
+            print(f\"Failed to initialize Ray: {e}\")
+        
+        # Monitor resources
+        while True:
+            try:
+                resources = rm.monitor_resources()
+                print(f\"Resource usage: {resources}\")
+                time.sleep(30)
+            except Exception as e:
+                print(f\"Monitoring error: {e}\")
+                time.sleep(30)
+        '
+      "
+    depends_on:
+      - dask-scheduler
+      - ray-head
+    environment:
+      - DASK_SCHEDULER_ADDRESS=dask-scheduler:8786
+      - RAY_ADDRESS=ray-head:10001
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+
+  # PostgreSQL database (required dependency)
+  postgres:
+    image: postgres:15-alpine
+    container_name: mlpipeline-postgres-distributed
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=mlpipeline
+      - POSTGRES_USER=mlpipeline
+      - POSTGRES_PASSWORD=mlpipeline123
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlpipeline -d mlpipeline"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MLflow tracking server (required dependency)
+  mlflow:
+    image: python:3.11-slim
+    container_name: mlflow-server-distributed
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql://mlpipeline:mlpipeline123@postgres:5432/mlflow
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    command: >
+      bash -c "
+        pip install mlflow psycopg2-binary &&
+        mlflow server 
+        --backend-store-uri postgresql://mlpipeline:mlpipeline123@postgres:5432/mlflow
+        --default-artifact-root /mlflow/artifacts
+        --host 0.0.0.0
+        --port 5000
+      "
+    depends_on:
+      - postgres
+    networks:
+      - mlpipeline-network
+    restart: unless-stopped
+
+volumes:
+  mlflow-artifacts:
+  postgres-data:
+
+networks:
+  mlpipeline-network:
+    driver: bridge

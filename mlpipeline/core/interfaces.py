@@ -106,3 +106,37 @@ class PipelineOrchestrator(ABC):
     def execute_stage(self, stage: PipelineStage, context: ExecutionContext) -> ExecutionResult:
         """Execute a single pipeline stage."""
         pass
+
+
+class DistributedBackend(ABC):
+    """Abstract base class for distributed computing backends."""
+    
+    @abstractmethod
+    def initialize(self) -> None:
+        """Initialize the distributed backend."""
+        pass
+    
+    @abstractmethod
+    def shutdown(self) -> None:
+        """Shutdown the distributed backend."""
+        pass
+    
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Check if the backend is available and ready."""
+        pass
+    
+    @abstractmethod
+    def get_cluster_info(self) -> Dict[str, Any]:
+        """Get information about the cluster."""
+        pass
+    
+    @abstractmethod
+    def submit_task(self, func, *args, **kwargs) -> Any:
+        """Submit a task for execution."""
+        pass
+    
+    @abstractmethod
+    def get_resource_usage(self) -> Dict[str, Any]:
+        """Get current resource usage."""
+        pass

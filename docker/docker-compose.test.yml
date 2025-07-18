@@ -1,0 +1,56 @@
+# Docker Compose configuration for testing
+version: '3.8'
+
+services:
+  # Test runner service
+  test-runner:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: development
+    container_name: mlpipeline-test-runner
+    volumes:
+      - ..:/app
+      - test-results:/app/test-results
+    environment:
+      - PYTHONPATH=/app
+      - PYTEST_ARGS=--junitxml=/app/test-results/junit.xml --cov=/app/mlpipeline --cov-report=xml:/app/test-results/coverage.xml
+    command: >
+      bash -c "
+        pip install -e . &&
+        pytest tests/ -v $$PYTEST_ARGS
+      "
+    depends_on:
+      - postgres-test
+      - redis-test
+    networks:
+      - test-network
+
+  # Test database
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: mlpipeline-postgres-test
+    environment:
+      - POSTGRES_DB=mlpipeline_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - test-network
+
+  # Test Redis
+  redis-test:
+    image: redis:7-alpine
+    container_name: mlpipeline-redis-test
+    tmpfs:
+      - /data
+    networks:
+      - test-network
+
+volumes:
+  test-results:
+
+networks:
+  test-network:
+    driver: bridge
