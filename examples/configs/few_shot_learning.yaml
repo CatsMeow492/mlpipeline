@@ -1,0 +1,93 @@
+# Few-Shot Learning Pipeline Configuration
+# This example demonstrates few-shot learning with Hugging Face transformers
+
+pipeline:
+  name: "few_shot_text_classification"
+  description: "Few-shot text classification using pre-trained language models"
+  tags: ["few-shot", "nlp", "huggingface", "text-classification"]
+  mlflow_tracking_uri: "file:./mlruns"
+
+data:
+  sources:
+    - type: "json"
+      path: "data/text_classification_examples.json"
+  
+  preprocessing:
+    - type: "text_tokenizer"
+      columns: ["text"]
+      parameters:
+        max_length: 512
+        truncation: true
+        padding: true
+    - type: "label_encoder"
+      columns: ["label"]
+  
+  train_split: 0.1  # Small training set for few-shot
+  validation_split: 0.1
+  test_split: 0.8
+  stratify: true
+  random_state: 42
+
+model:
+  type: "huggingface"
+  parameters:
+    model_name: "microsoft/DialoGPT-medium"
+    task: "text-classification"
+    num_labels: 3
+    device: "auto"  # Use GPU if available
+    max_length: 512
+    learning_rate: 2e-5
+    num_train_epochs: 3
+    per_device_train_batch_size: 8
+    per_device_eval_batch_size: 16
+    warmup_steps: 100
+    weight_decay: 0.01
+    logging_steps: 10
+    save_steps: 500
+    evaluation_strategy: "steps"
+    eval_steps: 500
+  
+  hyperparameter_tuning:
+    method: "optuna"
+    n_trials: 20
+    parameters:
+      learning_rate: [1e-5, 2e-5, 3e-5, 5e-5]
+      per_device_train_batch_size: [4, 8, 16]
+      num_train_epochs: [2, 3, 4, 5]
+      warmup_steps: [50, 100, 200]
+      weight_decay: [0.0, 0.01, 0.1]
+    cv_folds: 3
+    scoring: "f1_macro"
+  
+  early_stopping: true
+  early_stopping_patience: 3
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "f1_macro", "f1_micro"]
+  cross_validation: false  # Not typical for few-shot learning
+  generate_plots: true
+  plot_types: ["confusion_matrix", "classification_report"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "data/baseline_text_data.json"
+  methods: ["evidently"]
+  thresholds:
+    data_drift: 0.2  # Higher threshold for text data
+    prediction_drift: 0.1
+  monitoring_window: 100
+  alert_channels: ["email:ml-team@company.com"]
+
+few_shot:
+  enabled: true
+  prompt_template: "templates/text_classification_prompt.txt"
+  max_examples: 8
+  similarity_threshold: 0.75
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  example_store_path: "data/few_shot_examples.json"
+
+logging:
+  level: "INFO"
+  file_path: "logs/few_shot_pipeline.log"
+  max_file_size: "25MB"
+  backup_count: 5

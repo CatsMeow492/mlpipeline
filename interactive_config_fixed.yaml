@@ -1,0 +1,39 @@
+data:
+  preprocessing:
+  - columns:
+    - all_numeric
+    type: standard_scaler
+  sources:
+  - path: data/train.csv
+    schema: schemas/data_schema.json
+    type: csv
+  test_path: data/test.csv
+drift_detection:
+  baseline_data: data/train.csv
+  enabled: true
+  thresholds:
+    data_drift: 0.1
+    prediction_drift: 0.05
+evaluation:
+  cross_validation: true
+  metrics:
+  - accuracy
+  - precision
+  - recall
+  - f1_score
+  - roc_auc
+model:
+  hyperparameter_tuning:
+    direction: maximize
+    enabled: true
+    method: optuna
+    n_trials: 50
+  parameters:
+    algorithm: RandomForestClassifier
+    max_depth: 10
+    n_estimators: 100
+    random_state: 42
+  type: sklearn
+pipeline:
+  name: test-pipeline-2
+  version: 1.0.0

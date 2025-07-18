@@ -1,0 +1,8 @@
+You are a text classifier. Given the following examples and a new text, classify the new text into one of the categories.
+
+Examples:
+{examples}
+
+New text to classify: {input_text}
+
+Classification: 

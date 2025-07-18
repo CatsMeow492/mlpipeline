@@ -10,29 +10,31 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from evidently import ColumnMapping
-from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
-from evidently.metrics import (
-    ColumnDriftMetric,
-    DatasetDriftMetric,
-    DatasetMissingValuesMetric,
-)
-from evidently.report import Report
-from evidently.test_suite import TestSuite
-from evidently.tests import (
-    TestColumnDrift,
-    TestShareOfMissingValues,
-    TestNumberOfColumnsWithMissingValues,
-)
+from evidently import ColumnType, DataDefinition
+from evidently import Report
+try:
+    from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+    from evidently.metrics import (
+        ColumnDriftMetric,
+        DatasetDriftMetric,
+        DatasetMissingValuesMetric,
+    )
+    EVIDENTLY_LEGACY = True
+except ImportError:
+    # Newer evidently API
+    EVIDENTLY_LEGACY = False
 
-from ..core.interfaces import BaseComponent
+# TestSuite functionality is not available in newer evidently versions
+# We'll use Report-based approach instead
+
+from ..core.interfaces import PipelineComponent, ExecutionContext, ExecutionResult, ComponentType
 from ..core.errors import PipelineError
 
 
 logger = logging.getLogger(__name__)
 
 
-class DriftDetector(BaseComponent):
+class DriftDetector(PipelineComponent):
     """
     Drift detection component using Evidently AI for comprehensive drift analysis.
     
@@ -48,7 +50,7 @@ class DriftDetector(BaseComponent):
         baseline_data: Optional[pd.DataFrame] = None,
         baseline_path: Optional[str] = None,
         drift_thresholds: Optional[Dict[str, float]] = None,
-        column_mapping: Optional[ColumnMapping] = None,
+        column_mapping: Optional[Dict[str, Any]] = None,
         output_dir: str = "drift_reports",
     ):
         """
@@ -61,7 +63,8 @@ class DriftDetector(BaseComponent):
             column_mapping: Evidently column mapping configuration
             output_dir: Directory to save drift reports
         """
-        super().__init__()
+        from ..core.interfaces import ComponentType
+        super().__init__(ComponentType.DRIFT_DETECTION)
         self.baseline_data = baseline_data
         self.baseline_path = baseline_path
         self.drift_thresholds = drift_thresholds or {
@@ -76,6 +79,41 @@ class DriftDetector(BaseComponent):
         # Load baseline data if path provided
         if baseline_path and not baseline_data:
             self._load_baseline_data()
+    
+
+    
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validate drift detection configuration."""
+        required_fields = ['baseline_data', 'drift_thresholds']
+        for field in required_fields:
+            if field not in config:
+                return False
+        return True
+    
+    def execute(self, context: ExecutionContext) -> ExecutionResult:
+        """Execute drift detection on current data."""
+        try:
+            current_data = context.metadata.get('current_data')
+            if current_data is None:
+                return ExecutionResult(
+                    success=False,
+                    error_message="No current data provided for drift detection"
+                )
+            
+            # Perform drift detection
+            drift_results = self.detect_data_drift(current_data)
+            
+            return ExecutionResult(
+                success=True,
+                metrics=drift_results,
+                metadata={'drift_detected': drift_results.get('drift_detected', False)}
+            )
+            
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                error_message=f"Drift detection failed: {str(e)}"
+            )
     
     def _load_baseline_data(self) -> None:
         """Load baseline data from file."""
@@ -194,7 +232,7 @@ class DriftDetector(BaseComponent):
             ])
             
             # Set column mapping for predictions
-            column_mapping = ColumnMapping(target='prediction')
+            column_mapping = {'target': 'prediction'}
             
             # Run the report
             target_drift_report.run(
@@ -294,6 +332,9 @@ class DriftDetector(BaseComponent):
         """
         Run comprehensive drift test suite with pass/fail results.
         
+        Note: TestSuite functionality is not available in newer evidently versions.
+        This method returns a simplified test result based on drift detection.
+        
         Args:
             current_data: Current dataset to test
             save_report: Whether to save test results
@@ -310,29 +351,48 @@ class DriftDetector(BaseComponent):
             )
         
         try:
-            # Create test suite
-            drift_test_suite = TestSuite(tests=[
-                TestColumnDrift(),
-                TestShareOfMissingValues(),
-                TestNumberOfColumnsWithMissingValues(),
-            ])
+            # Since TestSuite is not available, we'll use drift detection results
+            # to simulate test results
+            data_drift_results = self.detect_data_drift(current_data, save_report=False)
+            feature_drift_results = self.detect_feature_drift(current_data, save_report=False)
             
-            # Run tests
-            drift_test_suite.run(
-                reference_data=self.baseline_data,
-                current_data=current_data,
-                column_mapping=self.column_mapping
-            )
+            # Create simplified test results
+            tests = []
             
-            # Extract test results
-            test_results = drift_test_suite.as_dict()
-            results = self._extract_test_results(test_results)
+            # Data drift test
+            tests.append({
+                'name': 'DataDriftTest',
+                'status': 'FAIL' if data_drift_results['drift_detected'] else 'SUCCESS',
+                'description': f"Data drift detection with threshold {data_drift_results.get('threshold', 0.1)}",
+                'parameters': {'drift_score': data_drift_results.get('drift_score', 0.0)},
+            })
             
-            # Save report if requested
+            # Feature drift test
+            tests.append({
+                'name': 'FeatureDriftTest',
+                'status': 'FAIL' if feature_drift_results['drift_detected'] else 'SUCCESS',
+                'description': f"Feature drift detection with threshold {feature_drift_results.get('threshold', 0.1)}",
+                'parameters': {'drift_score': feature_drift_results.get('drift_score', 0.0)},
+            })
+            
+            # Calculate summary
+            total_tests = len(tests)
+            passed_tests = sum(1 for test in tests if test['status'] == 'SUCCESS')
+            
+            results = {
+                'total_tests': total_tests,
+                'tests_passed': passed_tests,
+                'tests_failed': total_tests - passed_tests,
+                'success_rate': passed_tests / total_tests if total_tests > 0 else 0.0,
+                'timestamp': datetime.now().isoformat(),
+                'test_details': tests
+            }
+            
+            # Save simplified report if requested
             if save_report:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 report_name = report_name or f"drift_test_suite_{timestamp}"
-                self._save_test_suite(drift_test_suite, report_name)
+                self._save_simplified_test_report(results, report_name)
             
             logger.info(f"Drift test suite completed. Tests passed: {results['tests_passed']}/{results['total_tests']}")
             return results
@@ -501,21 +561,18 @@ class DriftDetector(BaseComponent):
         except Exception as e:
             logger.error(f"Failed to save drift report: {e}")
     
-    def _save_test_suite(self, test_suite: TestSuite, report_name: str) -> None:
-        """Save Evidently test suite to file."""
+    def _save_simplified_test_report(self, results: Dict[str, Any], report_name: str) -> None:
+        """Save simplified test report to file."""
         try:
-            # Save as HTML
-            html_path = self.output_dir / f"{report_name}.html"
-            test_suite.save_html(str(html_path))
-            
             # Save as JSON
             json_path = self.output_dir / f"{report_name}.json"
-            test_suite.save_json(str(json_path))
+            with open(json_path, 'w') as f:
+                json.dump(results, f, indent=2)
             
-            logger.info(f"Saved test suite to {html_path} and {json_path}")
+            logger.info(f"Saved simplified test report to {json_path}")
             
         except Exception as e:
-            logger.error(f"Failed to save test suite: {e}")
+            logger.error(f"Failed to save simplified test report: {e}")
     
     def get_baseline_statistics(self) -> Dict[str, Any]:
         """Get baseline data statistics for reference."""

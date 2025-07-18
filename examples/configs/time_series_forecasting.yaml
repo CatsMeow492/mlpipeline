@@ -1,0 +1,108 @@
+# Time Series Forecasting Pipeline Configuration
+# This example demonstrates time series forecasting with feature engineering and drift detection
+
+pipeline:
+  name: "time_series_forecasting"
+  description: "Time series forecasting with automated feature engineering and monitoring"
+  tags: ["time-series", "forecasting", "sklearn", "feature-engineering"]
+  mlflow_tracking_uri: "file:./mlruns"
+
+data:
+  sources:
+    - type: "csv"
+      path: "data/time_series_data.csv"
+      date_column: "timestamp"
+      target_column: "value"
+      frequency: "D"  # Daily frequency
+  
+  preprocessing:
+    - type: "time_series_features"
+      parameters:
+        lag_features: [1, 2, 3, 7, 14, 30]  # Lag periods
+        rolling_features: 
+          - window: 7
+            functions: ["mean", "std", "min", "max"]
+          - window: 30
+            functions: ["mean", "std"]
+        seasonal_features: true
+        trend_features: true
+        holiday_features: true
+    - type: "missing_value_imputer"
+      columns: ["all_numeric"]
+      parameters:
+        strategy: "forward_fill"
+    - type: "outlier_detection"
+      columns: ["value"]
+      parameters:
+        method: "isolation_forest"
+        contamination: 0.1
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  time_based_split: true  # Respect temporal order
+  random_state: 42
+
+model:
+  type: "sklearn"
+  parameters:
+    algorithm: "RandomForestRegressor"
+    n_estimators: 200
+    max_depth: 15
+    min_samples_split: 5
+    min_samples_leaf: 2
+    random_state: 42
+    n_jobs: -1
+  
+  hyperparameter_tuning:
+    method: "optuna"
+    n_trials: 75
+    timeout: 5400  # 1.5 hours
+    parameters:
+      n_estimators: [100, 200, 300, 500]
+      max_depth: [10, 15, 20, 25]
+      min_samples_split: [2, 5, 10]
+      min_samples_leaf: [1, 2, 4, 8]
+      max_features: ["sqrt", "log2", 0.5, 0.8]
+    cv_folds: 5
+    scoring: "neg_mean_absolute_error"
+    time_series_cv: true  # Use time series cross-validation
+  
+  early_stopping: false
+
+evaluation:
+  metrics: ["mae", "mse", "rmse", "mape", "smape", "r2_score"]
+  cross_validation: true
+  cv_folds: 5
+  time_series_cv: true
+  generate_plots: true
+  plot_types: ["forecast_plot", "residuals", "feature_importance", "prediction_intervals"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "data/baseline_time_series.csv"
+  methods: ["evidently", "statistical_tests"]
+  thresholds:
+    data_drift: 0.1
+    prediction_drift: 0.05
+    concept_drift: 0.15
+  monitoring_window: 30  # 30 days
+  alert_channels: ["email:forecasting-team@company.com", "slack:#forecasting-alerts"]
+  retrain_threshold: 0.2  # Trigger retraining if drift exceeds this
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/time_series_pipeline.log"
+  max_file_size: "50MB"
+  backup_count: 10
+
+# Time series specific settings
+time_series:
+  forecast_horizon: 30  # Days to forecast
+  confidence_intervals: [0.8, 0.95]  # Prediction intervals
+  seasonality_detection: true
+  trend_detection: true
+  anomaly_detection: true

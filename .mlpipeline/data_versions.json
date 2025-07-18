@@ -1,0 +1,128 @@
+{
+  "7b211d8ca704": {
+    "version_id": "7b211d8ca704",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmpp0lmfcmz/sample_data.csv",
+    "file_hash": "8a4d80fa7786210abf9e083880f6e2dc3cf641740aa6952a8ff8cad03c3a8997",
+    "size_bytes": 57,
+    "created_at": "2025-07-17T17:52:54.297024",
+    "metadata": {
+      "stage": "data_versioning",
+      "experiment_id": "dvc_test",
+      "component_type": "ComponentType.DATA_PREPROCESSING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "0e65be6b3863": {
+    "version_id": "0e65be6b3863",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp9rhg7sdg/val_preprocessed.parquet",
+    "file_hash": "3c648e8185b98201b0aaa39a1a887d7e8c6abe49a8406f1189ef2020a3264ae1",
+    "size_bytes": 2314,
+    "created_at": "2025-07-17T17:52:54.335254",
+    "metadata": {
+      "stage": "data_versioning",
+      "experiment_id": "dvc_test",
+      "component_type": "ComponentType.DATA_PREPROCESSING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "63865f7e423a": {
+    "version_id": "63865f7e423a",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp9rhg7sdg/train_preprocessed.parquet",
+    "file_hash": "33cb46c8d63a2f83591dc15e7821af1abdab4ba6bda76a97f6a3a0377283d4a9",
+    "size_bytes": 2326,
+    "created_at": "2025-07-17T17:52:54.336115",
+    "metadata": {
+      "stage": "data_versioning",
+      "experiment_id": "dvc_test",
+      "component_type": "ComponentType.DATA_PREPROCESSING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "35323b5dd615": {
+    "version_id": "35323b5dd615",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp0nl3dkwf/val_preprocessed.parquet",
+    "file_hash": "db0ddde2a51776b4556a66def39a2e94d5a0c243da00b8c01cbd4b47175b64d1",
+    "size_bytes": 2661,
+    "created_at": "2025-07-17T17:52:54.354040",
+    "metadata": {
+      "stage": "integration",
+      "experiment_id": "combined_test",
+      "component_type": "ComponentType.MODEL_TRAINING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "46a6441fba52": {
+    "version_id": "46a6441fba52",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp0nl3dkwf/train_preprocessed.parquet",
+    "file_hash": "693a89695c85ae3b7d96cee26fc513643e080d7122766635fb368e344fb1aeda",
+    "size_bytes": 3762,
+    "created_at": "2025-07-17T17:52:54.354425",
+    "metadata": {
+      "stage": "integration",
+      "experiment_id": "combined_test",
+      "component_type": "ComponentType.MODEL_TRAINING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "efa27b98da86": {
+    "version_id": "efa27b98da86",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp0nl3dkwf/sample_data.csv",
+    "file_hash": "9fd78ddf1b085c9dc1caa5451570e12e497ad9360fa6bd00f6e25d300d212203",
+    "size_bytes": 4153,
+    "created_at": "2025-07-17T17:52:54.354755",
+    "metadata": {
+      "stage": "integration",
+      "experiment_id": "combined_test",
+      "component_type": "ComponentType.MODEL_TRAINING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "4cd3a86bcfe2": {
+    "version_id": "4cd3a86bcfe2",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp0nl3dkwf/training_metrics.json",
+    "file_hash": "e0dd35eabc1dbfc9c0e5cbedb5069223045add6d64f8cb3d3dfc9f57a8b0b7ce",
+    "size_bytes": 510,
+    "created_at": "2025-07-17T17:52:54.354951",
+    "metadata": {
+      "stage": "integration",
+      "experiment_id": "combined_test",
+      "component_type": "ComponentType.MODEL_TRAINING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "b0d81e30cfa0": {
+    "version_id": "b0d81e30cfa0",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmp0nl3dkwf/model_config.json",
+    "file_hash": "d0ad6b6a6fbe398824a340406eaaed5a025c9dbf38fae0d5ac48daf27b7d73cc",
+    "size_bytes": 170,
+    "created_at": "2025-07-17T17:52:54.355149",
+    "metadata": {
+      "stage": "integration",
+      "experiment_id": "combined_test",
+      "component_type": "ComponentType.MODEL_TRAINING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  },
+  "625f916b749a": {
+    "version_id": "625f916b749a",
+    "file_path": "/var/folders/hm/88psj8hx1zzb72pml18py5sh0000gn/T/tmpw2atg8ml/training_metrics.json",
+    "file_hash": "2dd647ea1f2eab5033c613c072c2631ae5919abf180b4cb2d4896cac6c8400d5",
+    "size_bytes": 510,
+    "created_at": "2025-07-17T18:04:08.857551",
+    "metadata": {
+      "stage": "integration",
+      "experiment_id": "combined_test",
+      "component_type": "ComponentType.MODEL_TRAINING",
+      "created_by": "mlpipeline"
+    },
+    "parent_versions": []
+  }
+}

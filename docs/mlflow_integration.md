@@ -1,562 +1,483 @@
-# MLflow Integration
+# MLflow Integration Guide
 
-This document describes the MLflow integration capabilities of the ML Pipeline system, which provides comprehensive experiment tracking, model registry, and artifact management.
+This guide explains how to use MLflow with the ML Pipeline framework for experiment tracking, model registry, and artifact management.
 
 ## Overview
 
-The MLflow integration enables:
+MLflow integration provides:
 - **Experiment Tracking**: Automatic logging of parameters, metrics, and artifacts
-- **Model Registry**: Versioned model storage with lifecycle management
-- **Run Comparison**: Compare multiple experiments and their results
-- **Artifact Management**: Store and retrieve model artifacts, plots, and data
-- **Hyperparameter Optimization Tracking**: Track individual optimization trials
+- **Model Registry**: Version control for trained models
+- **Artifact Storage**: Centralized storage for model artifacts and outputs
+- **Comparison Tools**: Compare experiments and model performance
 
-## Components
+## Setup
 
-### MLflowConfig
+### Local MLflow Server
 
-Configuration class for MLflow integration settings.
+For development and testing:
 
-```python
-from mlpipeline.models.mlflow_integration import MLflowConfig
+```bash
+# Install MLflow
+pip install mlflow
 
-config = MLflowConfig(
-    tracking_uri="http://localhost:5000",
-    experiment_name="my-ml-experiment",
-    log_params=True,
-    log_metrics=True,
-    log_artifacts=True,
-    log_model=True,
-    register_model=True,
-    model_name="production-classifier",
-    tags={"environment": "production", "version": "1.0"}
-)
+# Start local tracking server
+mlflow server --host 0.0.0.0 --port 5000
+
+# Access UI at http://localhost:5000
 ```
 
-#### Configuration Options
+### Remote MLflow Server
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `tracking_uri` | str | None | MLflow tracking server URI |
-| `experiment_name` | str | "ml-pipeline-experiment" | Name of the MLflow experiment |
-| `run_name` | str | None | Name for individual runs |
-| `log_params` | bool | True | Whether to log parameters |
-| `log_metrics` | bool | True | Whether to log metrics |
-| `log_artifacts` | bool | True | Whether to log artifacts |
-| `log_model` | bool | True | Whether to log the trained model |
-| `log_input_example` | bool | False | Whether to log input examples |
-| `log_model_signature` | bool | True | Whether to log model signature |
-| `register_model` | bool | False | Whether to register model in registry |
-| `model_name` | str | None | Name for model registry |
-| `model_stage` | str | "None" | Model stage (None, Staging, Production, Archived) |
-| `tags` | dict | {} | Custom tags for runs |
+For production environments, configure a remote MLflow server:
 
-### MLflowTracker
-
-Core MLflow tracking functionality.
-
-```python
-from mlpipeline.models.mlflow_integration import MLflowTracker, MLflowConfig
-
-# Create tracker
-config = MLflowConfig(experiment_name="my-experiment")
-tracker = MLflowTracker(config)
-
-# Start a run
-run_id = tracker.start_run(
-    run_name="experiment_1",
-    tags={"model_type": "random_forest"}
-)
-
-# Log parameters
-tracker.log_params({
-    "n_estimators": 100,
-    "max_depth": 10,
-    "random_state": 42
-})
-
-# Log metrics
-tracker.log_metrics({
-    "accuracy": 0.95,
-    "f1_score": 0.93
-})
-
-# Log artifacts
-tracker.log_artifacts(["model.pkl", "plots/"])
-
-# End run
-tracker.end_run()
+```yaml
+pipeline:
+  mlflow_tracking_uri: "http://mlflow.company.com:5000"
+  artifact_location: "s3://ml-artifacts/experiments"
 ```
 
-### MLflowIntegratedTrainer
+### Database Backend
 
-Model trainer with built-in MLflow tracking.
+For persistent storage, configure a database backend:
 
-```python
-from mlpipeline.models.mlflow_integration import MLflowIntegratedTrainer, MLflowConfig
-from mlpipeline.core.interfaces import ExecutionContext, ComponentType
-
-# Configure MLflow
-mlflow_config = MLflowConfig(
-    experiment_name="model-training-experiment",
-    log_model=True,
-    register_model=True,
-    model_name="my-classifier"
-)
-
-# Create trainer
-trainer = MLflowIntegratedTrainer(mlflow_config)
-
-# Configure training
-config = {
-    'mlflow': {
-        'enabled': True,
-        'experiment_name': 'model-training-experiment'
-    },
-    'training': {
-        'model': {
-            'framework': 'sklearn',
-            'model_type': 'random_forest_classifier',
-            'task_type': 'classification',
-            'parameters': {
-                'n_estimators': 100,
-                'max_depth': 10,
-                'random_state': 42
-            }
-        },
-        'target_column': 'target'
-    }
-}
-
-# Create execution context
-context = ExecutionContext(
-    experiment_id="exp_001",
-    stage_name="training",
-    component_type=ComponentType.MODEL_TRAINING,
-    config=config,
-    artifacts_path="/path/to/artifacts",
-    logger=trainer.logger
-)
-
-# Execute training with MLflow tracking
-result = trainer.execute(context)
-
-if result.success:
-    print(f"MLflow run ID: {result.metadata['mlflow_run_id']}")
-    print(f"Model metrics: {result.metrics}")
+```bash
+# PostgreSQL example
+mlflow server \
+  --backend-store-uri postgresql://user:password@localhost:5432/mlflow \
+  --default-artifact-root s3://ml-artifacts \
+  --host 0.0.0.0 \
+  --port 5000
 ```
 
-### MLflowIntegratedEvaluator
-
-Model evaluator with MLflow tracking.
-
-```python
-from mlpipeline.models.mlflow_integration import MLflowIntegratedEvaluator
-
-evaluator = MLflowIntegratedEvaluator(mlflow_config)
-
-config = {
-    'mlflow': {
-        'enabled': True,
-        'experiment_name': 'model-evaluation-experiment'
-    },
-    'evaluation': {
-        'metrics': ['accuracy', 'f1_score', 'roc_auc']
-    }
-}
-
-result = evaluator.execute(context)
-```
-
-### MLflowIntegratedHyperparameterTrainer
-
-Hyperparameter optimization with MLflow tracking for individual trials.
-
-```python
-from mlpipeline.models.mlflow_integration import MLflowIntegratedHyperparameterTrainer
-
-trainer = MLflowIntegratedHyperparameterTrainer(mlflow_config)
-
-config = {
-    'mlflow': {
-        'enabled': True,
-        'experiment_name': 'hyperparameter-optimization'
-    },
-    'training': {
-        'model': {
-            'framework': 'sklearn',
-            'model_type': 'random_forest_classifier',
-            'task_type': 'classification'
-        },
-        'hyperparameter_optimization': {
-            'enabled': True,
-            'n_trials': 50,
-            'metric': 'accuracy',
-            'parameter_space': {
-                'n_estimators': {'type': 'int', 'low': 10, 'high': 200},
-                'max_depth': {'type': 'int', 'low': 3, 'high': 20}
-            }
-        }
-    }
-}
-
-result = trainer.execute(context)
-
-# Access optimization results
-print(f"Parent run ID: {result.metadata['mlflow_parent_run_id']}")
-print(f"Child runs: {result.metadata['mlflow_child_runs']}")
-print(f"Best parameters: {result.metadata['best_hyperparameters']}")
-```
-
-## Configuration Examples
+## Configuration
 
 ### Basic Configuration
 
 ```yaml
-mlflow:
-  enabled: true
-  experiment_name: "basic-ml-experiment"
-  tracking_uri: "http://localhost:5000"
-  
-training:
-  model:
-    framework: sklearn
-    model_type: random_forest_classifier
-    task_type: classification
-    parameters:
-      n_estimators: 100
-      max_depth: 10
+pipeline:
+  name: "customer_segmentation"
+  description: "Customer segmentation using clustering"
+  tags: ["clustering", "customer", "production"]
+  mlflow_tracking_uri: "http://localhost:5000"  # MLflow server URL
+  artifact_location: "s3://ml-artifacts"        # Optional: custom artifact location
 ```
 
-### Production Configuration with Model Registry
+### Environment Variables
 
-```yaml
-mlflow:
-  enabled: true
-  experiment_name: "production-model-training"
-  tracking_uri: "https://mlflow.company.com"
-  registry_uri: "https://mlflow.company.com"
-  
-  # Model registry settings
-  register_model: true
-  model_name: "customer-churn-classifier"
-  model_stage: "Staging"
-  model_description: "Customer churn prediction model v2.0"
-  
-  # Logging settings
-  log_model: true
-  log_input_example: true
-  log_model_signature: true
-  log_artifacts: true
-  
-  # Tags
-  tags:
-    environment: "production"
-    team: "data-science"
-    version: "2.0"
-    
-training:
-  model:
-    framework: sklearn
-    model_type: gradient_boosting_classifier
-    task_type: classification
-    parameters:
-      n_estimators: 200
-      learning_rate: 0.1
-      max_depth: 8
+You can also configure MLflow using environment variables:
+
+```bash
+export MLFLOW_TRACKING_URI=http://localhost:5000
+export MLFLOW_S3_ENDPOINT_URL=http://minio:9000  # For MinIO
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
 ```
 
-### Hyperparameter Optimization Configuration
+## Automatic Logging
+
+The ML Pipeline framework automatically logs:
+
+### Parameters
+- All model parameters
+- Preprocessing configuration
+- Data split ratios
+- Hyperparameter tuning settings
+
+### Metrics
+- Training metrics (accuracy, loss, etc.)
+- Validation metrics
+- Cross-validation scores
+- Hyperparameter optimization results
+
+### Artifacts
+- Trained model files
+- Preprocessing pipelines
+- Evaluation plots and reports
+- Configuration files
+- Feature importance data
+
+### Tags
+- Pipeline name and version
+- Model type
+- Dataset information
+- Custom tags from configuration
+
+## Example Logged Information
+
+When you run a training pipeline, MLflow automatically logs:
+
+```python
+# Parameters logged
+{
+    "model.type": "xgboost",
+    "model.n_estimators": 1000,
+    "model.max_depth": 6,
+    "model.learning_rate": 0.1,
+    "data.train_split": 0.7,
+    "preprocessing.standard_scaler.columns": ["feature1", "feature2"]
+}
+
+# Metrics logged
+{
+    "train_accuracy": 0.95,
+    "val_accuracy": 0.87,
+    "test_accuracy": 0.89,
+    "train_f1": 0.94,
+    "val_f1": 0.86,
+    "test_f1": 0.88,
+    "training_time": 45.2
+}
+
+# Artifacts logged
+[
+    "model/model.pkl",
+    "preprocessor/preprocessor.pkl",
+    "plots/confusion_matrix.png",
+    "plots/roc_curve.png",
+    "plots/feature_importance.png",
+    "config/pipeline_config.yaml",
+    "reports/evaluation_report.json"
+]
+```
+
+## Model Registry
+
+### Automatic Model Registration
+
+Models are automatically registered when training completes successfully:
 
 ```yaml
-mlflow:
-  enabled: true
-  experiment_name: "hyperparameter-optimization"
-  
-training:
-  model:
-    framework: sklearn
-    model_type: random_forest_classifier
-    task_type: classification
-    
-  hyperparameter_optimization:
-    enabled: true
-    method: optuna
+# Configuration enables automatic registration
+pipeline:
+  name: "fraud_detection_v2"
+  mlflow_tracking_uri: "http://localhost:5000"
+
+# Model will be registered as "fraud_detection_v2" with version number
+```
+
+### Manual Model Management
+
+You can also manage models manually using MLflow CLI:
+
+```bash
+# Register a model
+mlflow models register \
+  --model-uri runs:/abc123/model \
+  --name "fraud_detection"
+
+# Transition model to staging
+mlflow models transition \
+  --name "fraud_detection" \
+  --version 2 \
+  --stage "Staging"
+
+# Transition to production
+mlflow models transition \
+  --name "fraud_detection" \
+  --version 2 \
+  --stage "Production"
+```
+
+## Experiment Organization
+
+### Experiment Naming
+
+Use descriptive experiment names:
+
+```yaml
+pipeline:
+  name: "customer_churn_v3_xgboost_tuned"  # Version, model type, optimization
+  description: "XGBoost with Optuna tuning for customer churn prediction"
+  tags: ["churn", "xgboost", "tuned", "v3"]
+```
+
+### Hierarchical Organization
+
+Organize experiments by project:
+
+```yaml
+# Project: Customer Analytics
+pipeline:
+  name: "customer_analytics/churn_prediction"
+  tags: ["customer_analytics", "churn"]
+
+# Project: Fraud Detection  
+pipeline:
+  name: "fraud_detection/transaction_classifier"
+  tags: ["fraud_detection", "transactions"]
+```
+
+## Hyperparameter Tracking
+
+MLflow automatically tracks hyperparameter optimization:
+
+```yaml
+model:
+  hyperparameter_tuning:
+    method: "optuna"
     n_trials: 100
-    metric: f1_score
-    direction: maximize
-    cv_folds: 5
+    parameters:
+      n_estimators: [100, 500, 1000]
+      max_depth: [3, 5, 7, 10]
+      learning_rate: [0.01, 0.1, 0.2]
+```
+
+Each trial is logged as a child run with:
+- Trial parameters
+- Trial metrics
+- Trial duration
+- Trial status (completed, failed, pruned)
+
+## Artifact Management
+
+### Custom Artifacts
+
+Log additional artifacts in your custom components:
+
+```python
+import mlflow
+
+# In your custom component
+def execute(self, context):
+    # Your processing logic
+    result = process_data()
     
-    parameter_space:
-      n_estimators:
-        type: int
-        low: 50
-        high: 300
-      max_depth:
-        type: int
-        low: 5
-        high: 20
-      min_samples_split:
-        type: int
-        low: 2
-        high: 10
-      max_features:
-        type: categorical
-        choices: ["sqrt", "log2", null]
+    # Log custom artifacts
+    mlflow.log_artifact("custom_report.html")
+    mlflow.log_dict(result, "results.json")
+    mlflow.log_figure(plot, "custom_plot.png")
+    
+    return ExecutionResult(...)
 ```
 
-## Model Registry Usage
+### Artifact Organization
 
-### Registering Models
+Artifacts are organized by type:
 
-```python
-# During training
-config = MLflowConfig(
-    register_model=True,
-    model_name="production-classifier",
-    model_stage="Staging",
-    model_description="Latest version of the classifier"
-)
-
-trainer = MLflowIntegratedTrainer(config)
-result = trainer.execute(context)
-
-# Model is automatically registered
-model_version = result.metadata.get('mlflow_model_version')
-print(f"Registered model version: {model_version}")
+```
+artifacts/
+├── model/
+│   ├── model.pkl
+│   └── model_metadata.json
+├── preprocessor/
+│   └── preprocessor.pkl
+├── plots/
+│   ├── confusion_matrix.png
+│   ├── roc_curve.png
+│   └── feature_importance.png
+├── reports/
+│   ├── evaluation_report.json
+│   └── data_quality_report.html
+└── config/
+    └── pipeline_config.yaml
 ```
 
-### Managing Model Stages
+## Comparing Experiments
+
+### Using MLflow UI
+
+1. Navigate to the MLflow UI
+2. Select experiments to compare
+3. Use the comparison view to analyze:
+   - Parameter differences
+   - Metric trends
+   - Artifact differences
+
+### Using MLflow API
 
 ```python
-from mlflow.tracking import MlflowClient
+import mlflow
 
-client = MlflowClient()
+# Get experiment by name
+experiment = mlflow.get_experiment_by_name("customer_churn")
 
-# Transition model to production
-client.transition_model_version_stage(
-    name="production-classifier",
-    version="3",
-    stage="Production"
+# Search runs
+runs = mlflow.search_runs(
+    experiment_ids=[experiment.experiment_id],
+    filter_string="metrics.accuracy > 0.8",
+    order_by=["metrics.accuracy DESC"]
 )
 
-# Archive old version
-client.transition_model_version_stage(
-    name="production-classifier", 
-    version="2",
-    stage="Archived"
-)
+# Compare top runs
+top_runs = runs.head(5)
+print(top_runs[['run_id', 'metrics.accuracy', 'params.model.n_estimators']])
 ```
 
-## Run Comparison and Analysis
+## Production Deployment
 
-### Comparing Runs
+### Model Serving
 
-```python
-# Search for runs
-tracker = MLflowTracker(config)
-runs = tracker.search_runs(
-    filter_string="metrics.accuracy > 0.9",
-    max_results=10
-)
+Deploy models directly from MLflow:
 
-# Compare specific runs
-run_ids = [run.run_id for run in runs[:3]]
-comparison_df = tracker.compare_runs(run_ids)
-print(comparison_df)
+```bash
+# Serve model locally
+mlflow models serve \
+  --model-uri models:/fraud_detection/Production \
+  --port 5001
+
+# Deploy to cloud (example with AWS SageMaker)
+mlflow deployments create \
+  --target sagemaker \
+  --name fraud-detection-prod \
+  --model-uri models:/fraud_detection/Production
 ```
 
-### Querying Experiments
+### Model Loading
+
+Load models in production code:
 
 ```python
-# Get run information
-run_info = tracker.get_run_info("run-id-here")
-print(f"Run: {run_info.run_name}")
-print(f"Status: {run_info.status}")
-print(f"Metrics: {run_info.metrics}")
-print(f"Parameters: {run_info.params}")
+import mlflow.pyfunc
+
+# Load latest production model
+model = mlflow.pyfunc.load_model("models:/fraud_detection/Production")
+
+# Make predictions
+predictions = model.predict(new_data)
+```
+
+## Monitoring and Alerts
+
+### Model Performance Monitoring
+
+Track model performance over time:
+
+```python
+# Log production metrics
+with mlflow.start_run():
+    mlflow.log_metric("production_accuracy", current_accuracy)
+    mlflow.log_metric("data_drift_score", drift_score)
+    mlflow.set_tag("environment", "production")
+```
+
+### Automated Alerts
+
+Set up alerts for model degradation:
+
+```python
+# Example alert logic
+if current_accuracy < baseline_accuracy * 0.95:
+    mlflow.log_metric("alert_triggered", 1)
+    send_alert("Model performance degraded")
 ```
 
 ## Best Practices
 
-### 1. Experiment Organization
-
-- Use descriptive experiment names that reflect the purpose
-- Group related experiments together
+### Experiment Naming
 - Use consistent naming conventions
+- Include version numbers
+- Add descriptive tags
 
-```python
-# Good experiment names
-"customer-churn-baseline-models"
-"customer-churn-feature-engineering"
-"customer-churn-hyperparameter-tuning"
-"customer-churn-production-candidates"
-```
+### Parameter Logging
+- Log all relevant parameters
+- Include data preprocessing settings
+- Track environment information
 
-### 2. Tagging Strategy
+### Artifact Management
+- Organize artifacts by type
+- Include model metadata
+- Store evaluation reports
 
-- Use tags to categorize and filter runs
-- Include metadata like environment, team, and version
+### Model Registry
+- Use semantic versioning
+- Document model changes
+- Maintain staging/production stages
 
-```python
-tags = {
-    "environment": "development",
-    "team": "data-science",
-    "model_type": "ensemble",
-    "feature_set": "v2",
-    "data_version": "2023-12"
-}
-```
-
-### 3. Model Registry Workflow
-
-1. **Development**: Train models without registration
-2. **Staging**: Register promising models in "Staging"
-3. **Testing**: Validate staged models thoroughly
-4. **Production**: Promote to "Production" stage
-5. **Retirement**: Archive old models
-
-### 4. Artifact Management
-
-- Log all relevant artifacts (plots, reports, preprocessors)
-- Use consistent artifact paths
-- Include model explanations and documentation
-
-```python
-# Organize artifacts
-artifacts = [
-    "model/trained_model.pkl",
-    "plots/confusion_matrix.png", 
-    "plots/feature_importance.png",
-    "reports/model_evaluation.html",
-    "data/preprocessing_pipeline.pkl"
-]
-```
+### Performance
+- Use batch logging for large experiments
+- Configure appropriate artifact storage
+- Monitor storage costs
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **MLflow Server Connection**
-   ```python
-   # Test connection
-   import mlflow
-   mlflow.set_tracking_uri("http://localhost:5000")
-   print(mlflow.get_tracking_uri())
-   ```
+**Connection Errors:**
+```bash
+# Check MLflow server status
+curl http://localhost:5000/health
 
-2. **Experiment Not Found**
-   ```python
-   # Create experiment if it doesn't exist
-   try:
-       experiment_id = mlflow.create_experiment("my-experiment")
-   except mlflow.exceptions.MlflowException:
-       experiment = mlflow.get_experiment_by_name("my-experiment")
-       experiment_id = experiment.experiment_id
-   ```
+# Verify tracking URI
+echo $MLFLOW_TRACKING_URI
+```
 
-3. **Model Registration Failures**
-   ```python
-   # Check model registry URI
-   print(mlflow.get_registry_uri())
-   
-   # Verify model exists in run
-   run = mlflow.get_run("run-id")
-   print(run.data.tags)
-   ```
+**Storage Issues:**
+```bash
+# Check artifact storage permissions
+aws s3 ls s3://ml-artifacts/
 
-### Error Handling
+# Verify credentials
+aws sts get-caller-identity
+```
 
-The MLflow integration includes comprehensive error handling:
+**Performance Issues:**
+- Use local artifact storage for development
+- Configure appropriate database backend
+- Monitor disk space usage
 
-- Connection failures are logged as warnings
-- Missing dependencies are detected early
-- Failed operations don't crash the pipeline
-- Detailed error messages for debugging
+### Debugging
 
-## Performance Considerations
-
-### Large Models
-
-- Use `log_model=False` for very large models
-- Log model metadata instead of the full model
-- Use external storage for large artifacts
-
-### High-Frequency Logging
-
-- Batch metric logging when possible
-- Use asynchronous logging for better performance
-- Consider sampling for very frequent updates
-
-### Storage Management
-
-- Regularly clean up old experiments
-- Archive completed experiments
-- Monitor storage usage
-
-## Integration with Other Tools
-
-### CI/CD Pipelines
+Enable debug logging:
 
 ```yaml
-# GitHub Actions example
-- name: Train Model with MLflow
-  run: |
-    export MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_URI }}
-    python train_model.py --config production.yaml
-    
-- name: Register Model
-  if: github.ref == 'refs/heads/main'
-  run: |
-    python register_model.py --run-id ${{ env.RUN_ID }}
+logging:
+  level: "DEBUG"
+  file_path: "logs/mlflow_debug.log"
 ```
 
-### Monitoring Systems
-
-- Export MLflow metrics to monitoring dashboards
-- Set up alerts for model performance degradation
-- Track model usage and performance in production
-
-## Security Considerations
-
-### Authentication
-
-```python
-# Set up authentication
-import os
-os.environ['MLFLOW_TRACKING_USERNAME'] = 'username'
-os.environ['MLFLOW_TRACKING_PASSWORD'] = 'password'
-
-# Or use token-based auth
-os.environ['MLFLOW_TRACKING_TOKEN'] = 'your-token'
-```
-
-### Access Control
-
-- Use MLflow's built-in authentication
-- Implement role-based access control
-- Secure model registry access
-- Audit model deployments
-
-## Examples
-
-See `examples/mlflow_integration_example.py` for comprehensive usage examples including:
-
-- Basic MLflow tracking
-- Integrated model training
-- Hyperparameter optimization with tracking
-- Model registry operations
-- Run comparison and analysis
-
-## Dependencies
-
-Required packages:
-- `mlflow>=2.0.0`
-- `scikit-learn` (for sklearn model logging)
-- `xgboost` (for XGBoost model logging)
-- `torch` (for PyTorch model logging)
-
-Install with:
+Check MLflow logs:
 ```bash
-pip install mlflow scikit-learn xgboost torch
+# MLflow server logs
+tail -f mlflow_server.log
+
+# Application logs
+tail -f logs/pipeline.log
 ```
+
+## Integration Examples
+
+### Complete Training Pipeline
+
+```yaml
+pipeline:
+  name: "recommendation_system_v1"
+  description: "Collaborative filtering recommendation system"
+  tags: ["recommendations", "collaborative_filtering", "v1"]
+  mlflow_tracking_uri: "http://mlflow.company.com:5000"
+  artifact_location: "s3://ml-artifacts/recommendations"
+
+data:
+  sources:
+    - type: "sql"
+      connection_string: "${DB_CONNECTION}"
+      query: "SELECT * FROM user_interactions WHERE date >= '2023-01-01'"
+
+model:
+  type: "sklearn"
+  parameters:
+    algorithm: "NMF"
+    n_components: 50
+    random_state: 42
+  
+  hyperparameter_tuning:
+    method: "optuna"
+    n_trials: 50
+    parameters:
+      n_components: [20, 50, 100, 200]
+      alpha: [0.0, 0.1, 0.5]
+      l1_ratio: [0.0, 0.5, 1.0]
+
+evaluation:
+  metrics: ["rmse", "mae", "precision_at_k", "recall_at_k"]
+  generate_plots: true
+  plot_types: ["learning_curve", "validation_curve"]
+```
+
+This configuration will automatically:
+1. Create an MLflow experiment named "recommendation_system_v1"
+2. Log all parameters, metrics, and artifacts
+3. Track hyperparameter optimization trials
+4. Register the best model in the model registry
+5. Generate and store evaluation plots
+
+The MLflow UI will show all this information organized and searchable, making it easy to track progress and compare different approaches.

@@ -1,0 +1,75 @@
+# Basic Classification Pipeline Configuration
+# This example demonstrates a simple binary classification pipeline using scikit-learn
+
+pipeline:
+  name: "basic_classification_example"
+  description: "Basic binary classification using Random Forest"
+  tags: ["classification", "sklearn", "example"]
+  mlflow_tracking_uri: "file:./mlruns"
+
+data:
+  sources:
+    - type: "csv"
+      path: "data/classification_dataset.csv"
+      schema_path: "schemas/classification_schema.json"
+  
+  preprocessing:
+    - type: "standard_scaler"
+      columns: ["feature1", "feature2", "feature3", "feature4"]
+    - type: "label_encoder"
+      columns: ["category_feature"]
+    - type: "one_hot_encoder"
+      columns: ["categorical_feature"]
+      parameters:
+        drop: "first"
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true
+  random_state: 42
+
+model:
+  type: "sklearn"
+  parameters:
+    algorithm: "RandomForestClassifier"
+    n_estimators: 100
+    max_depth: 10
+    min_samples_split: 2
+    min_samples_leaf: 1
+    random_state: 42
+    class_weight: "balanced"
+  
+  hyperparameter_tuning:
+    method: "optuna"
+    n_trials: 50
+    timeout: 3600  # 1 hour
+    parameters:
+      n_estimators: [50, 100, 200, 300]
+      max_depth: [5, 10, 15, 20, null]
+      min_samples_split: [2, 5, 10]
+      min_samples_leaf: [1, 2, 4]
+    cv_folds: 5
+    scoring: "f1_weighted"
+  
+  early_stopping: false
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 5
+  stratify: true
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "precision_recall_curve", "feature_importance"]
+
+drift_detection:
+  enabled: false
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/classification_pipeline.log"
+  max_file_size: "10MB"
+  backup_count: 5

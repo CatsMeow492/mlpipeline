@@ -1,0 +1,27 @@
+data:
+  preprocessing:
+  - columns:
+    - feature1
+    - feature2
+    type: standard_scaler
+  sources:
+  - path: data/train.csv
+    type: csv
+evaluation:
+  metrics:
+  - accuracy
+  - f1_score
+  - precision
+  - recall
+model:
+  parameters:
+    algorithm: RandomForestClassifier
+    n_estimators: 100
+    random_state: 42
+  type: sklearn
+pipeline:
+  description: Example ML pipeline experiment
+  name: example_experiment
+  tags:
+  - example
+  - demo

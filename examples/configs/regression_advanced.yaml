@@ -1,0 +1,97 @@
+# Advanced Regression Pipeline Configuration
+# This example demonstrates a regression pipeline with XGBoost and drift detection
+
+pipeline:
+  name: "advanced_regression_example"
+  description: "Advanced regression with XGBoost, hyperparameter tuning, and drift monitoring"
+  tags: ["regression", "xgboost", "drift-detection", "advanced"]
+  mlflow_tracking_uri: "http://localhost:5000"
+  artifact_location: "s3://my-mlflow-bucket/artifacts"
+
+data:
+  sources:
+    - type: "csv"
+      path: "data/housing_prices.csv"
+    - type: "parquet"
+      path: "data/additional_features.parquet"
+  
+  preprocessing:
+    - type: "robust_scaler"
+      columns: ["price", "square_feet", "bedrooms", "bathrooms"]
+    - type: "polynomial_features"
+      columns: ["square_feet", "lot_size"]
+      parameters:
+        degree: 2
+        include_bias: false
+    - type: "target_encoder"
+      columns: ["neighborhood", "property_type"]
+      parameters:
+        smoothing: 1.0
+    - type: "missing_value_imputer"
+      columns: ["garage_size", "year_built"]
+      parameters:
+        strategy: "median"
+  
+  train_split: 0.6
+  validation_split: 0.2
+  test_split: 0.2
+  stratify: false  # Not applicable for regression
+  random_state: 123
+
+model:
+  type: "xgboost"
+  parameters:
+    objective: "reg:squarederror"
+    n_estimators: 1000
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 123
+    n_jobs: -1
+  
+  hyperparameter_tuning:
+    method: "optuna"
+    n_trials: 100
+    timeout: 7200  # 2 hours
+    parameters:
+      n_estimators: [500, 1000, 1500, 2000]
+      max_depth: [3, 4, 5, 6, 7, 8]
+      learning_rate: [0.01, 0.05, 0.1, 0.2]
+      subsample: [0.6, 0.7, 0.8, 0.9, 1.0]
+      colsample_bytree: [0.6, 0.7, 0.8, 0.9, 1.0]
+      reg_alpha: [0, 0.1, 0.5, 1.0]
+      reg_lambda: [0, 0.1, 0.5, 1.0]
+    cv_folds: 5
+    scoring: "neg_mean_squared_error"
+  
+  early_stopping: true
+  early_stopping_patience: 50
+
+evaluation:
+  metrics: ["mse", "mae", "rmse", "r2_score", "mape"]
+  cross_validation: true
+  cv_folds: 5
+  stratify: false
+  generate_plots: true
+  plot_types: ["residuals", "prediction_vs_actual", "feature_importance", "learning_curve"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "data/baseline_housing_data.csv"
+  methods: ["evidently", "wasserstein", "kl_divergence"]
+  thresholds:
+    data_drift: 0.1
+    prediction_drift: 0.05
+    feature_drift: 0.15
+  monitoring_window: 500
+  alert_channels: ["email:alerts@company.com", "slack:#ml-alerts"]
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "DEBUG"
+  file_path: "logs/regression_pipeline.log"
+  max_file_size: "50MB"
+  backup_count: 10

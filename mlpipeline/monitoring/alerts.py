@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
-from ..core.interfaces import BaseComponent
+from ..core.interfaces import PipelineComponent, ExecutionContext, ExecutionResult, ComponentType
 from ..core.errors import PipelineError
 
 
@@ -345,7 +345,7 @@ class WebhookAlertChannel(AlertChannel):
         }
 
 
-class AlertManager(BaseComponent):
+class AlertManager(PipelineComponent):
     """
     Manages alert generation, routing, and lifecycle.
     
@@ -372,7 +372,8 @@ class AlertManager(BaseComponent):
             alert_history_file: File to persist alert history
             max_history_size: Maximum number of alerts to keep in history
         """
-        super().__init__()
+        from ..core.interfaces import ComponentType
+        super().__init__(ComponentType.DRIFT_DETECTION)
         self.rules = rules or []
         self.channels = channels or {}
         self.alert_history_file = alert_history_file
@@ -384,6 +385,34 @@ class AlertManager(BaseComponent):
         # Load alert history if file exists
         if alert_history_file:
             self._load_alert_history()
+    
+
+    
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validate alert manager configuration."""
+        # Basic validation - can be extended
+        return True
+    
+    def execute(self, context: ExecutionContext) -> ExecutionResult:
+        """Execute alert evaluation on provided metrics."""
+        try:
+            metrics = context.metadata.get('metrics', {})
+            source = context.metadata.get('source', 'pipeline')
+            
+            # Evaluate metrics and generate alerts
+            alerts = self.evaluate_metrics(metrics, source)
+            
+            return ExecutionResult(
+                success=True,
+                metrics={'alerts_generated': len(alerts)},
+                metadata={'alerts': [alert.to_dict() for alert in alerts]}
+            )
+            
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                error_message=f"Alert evaluation failed: {str(e)}"
+            )
     
     def add_rule(self, rule: AlertRule) -> None:
         """Add an alert rule."""

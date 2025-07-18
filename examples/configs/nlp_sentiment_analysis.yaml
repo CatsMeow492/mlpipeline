@@ -1,0 +1,113 @@
+# NLP Sentiment Analysis Pipeline Configuration
+# This example demonstrates text classification for sentiment analysis
+
+pipeline:
+  name: "sentiment_analysis_pipeline"
+  description: "Sentiment analysis using BERT-based models with text preprocessing"
+  tags: ["nlp", "sentiment", "bert", "text-classification"]
+  mlflow_tracking_uri: "file:./mlruns"
+
+data:
+  sources:
+    - type: "csv"
+      path: "data/movie_reviews.csv"
+      text_column: "review_text"
+      target_column: "sentiment"
+  
+  preprocessing:
+    - type: "text_cleaning"
+      columns: ["review_text"]
+      parameters:
+        lowercase: true
+        remove_punctuation: false
+        remove_stopwords: false
+        remove_html: true
+        remove_urls: true
+    - type: "text_tokenizer"
+      columns: ["review_text"]
+      parameters:
+        tokenizer: "bert-base-uncased"
+        max_length: 512
+        truncation: true
+        padding: "max_length"
+        return_attention_mask: true
+    - type: "label_encoder"
+      columns: ["sentiment"]
+      parameters:
+        classes: ["negative", "neutral", "positive"]
+  
+  train_split: 0.8
+  validation_split: 0.1
+  test_split: 0.1
+  stratify: true
+  random_state: 42
+
+model:
+  type: "huggingface"
+  parameters:
+    model_name: "bert-base-uncased"
+    task: "text-classification"
+    num_labels: 3
+    learning_rate: 2e-5
+    num_train_epochs: 3
+    per_device_train_batch_size: 16
+    per_device_eval_batch_size: 32
+    warmup_steps: 500
+    weight_decay: 0.01
+    logging_steps: 100
+    evaluation_strategy: "steps"
+    eval_steps: 500
+    save_steps: 1000
+    load_best_model_at_end: true
+    metric_for_best_model: "f1"
+    greater_is_better: true
+    device: "auto"
+  
+  hyperparameter_tuning:
+    method: "optuna"
+    n_trials: 15
+    timeout: 14400  # 4 hours
+    parameters:
+      learning_rate: [1e-5, 2e-5, 3e-5, 5e-5]
+      per_device_train_batch_size: [8, 16, 32]
+      num_train_epochs: [2, 3, 4]
+      warmup_steps: [100, 300, 500]
+      weight_decay: [0.0, 0.01, 0.1]
+    cv_folds: 3
+    scoring: "f1_macro"
+  
+  early_stopping: true
+  early_stopping_patience: 3
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "f1_macro", "f1_micro"]
+  cross_validation: false  # Not typical for transformer models
+  generate_plots: true
+  plot_types: ["confusion_matrix", "classification_report", "attention_visualization"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "data/baseline_reviews.csv"
+  methods: ["evidently"]
+  thresholds:
+    data_drift: 0.15  # Higher threshold for text data
+    prediction_drift: 0.1
+    vocabulary_drift: 0.2
+  monitoring_window: 1000
+  alert_channels: ["email:nlp-team@company.com"]
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "logs/sentiment_analysis.log"
+  max_file_size: "100MB"
+  backup_count: 5
+
+# Text-specific settings
+text_processing:
+  max_sequence_length: 512
+  batch_encoding: true
+  use_fast_tokenizer: true
+  cache_tokenized_data: true
