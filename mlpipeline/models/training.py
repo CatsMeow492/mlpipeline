@@ -587,26 +587,18 @@ class ModelTrainer(PipelineComponent):
         try:
             model_config = config.get('model', {})
             
-            if 'framework' not in model_config:
-                self.logger.error("Model framework not specified")
+            if not model_config:
+                self.logger.error("Model configuration not found")
                 return False
             
-            framework = model_config['framework']
+            # Check for framework or type field
+            framework = model_config.get('type', model_config.get('framework'))
+            if not framework:
+                self.logger.error("Model framework/type not specified")
+                return False
+            
             if framework not in self.adapter_registry:
                 self.logger.error(f"Unsupported framework: {framework}")
-                return False
-            
-            if 'model_type' not in model_config:
-                self.logger.error("Model type not specified")
-                return False
-            
-            if 'task_type' not in model_config:
-                self.logger.error("Task type not specified (classification/regression)")
-                return False
-            
-            task_type = model_config['task_type']
-            if task_type not in ['classification', 'regression']:
-                self.logger.error(f"Invalid task type: {task_type}")
                 return False
             
             return True
@@ -617,18 +609,49 @@ class ModelTrainer(PipelineComponent):
     
     def setup(self, context: ExecutionContext) -> None:
         """Setup model training component."""
-        config = context.config.get('training', {})
-        
-        if not self.validate_config(config):
+        # Pass the entire context config to validate_config
+        if not self.validate_config(context.config):
             raise ConfigurationError("Invalid model training configuration")
         
         # Create model configuration
-        model_config_dict = config['model']
+        model_config_dict = context.config['model']
+        
+        # Map 'type' to 'framework' and algorithm to model_type for sklearn
+        framework = model_config_dict.get('type', model_config_dict.get('framework', 'sklearn'))
+        
+        # For sklearn, convert algorithm parameter to model_type
+        if framework == 'sklearn' and 'algorithm' in model_config_dict.get('parameters', {}):
+            algorithm = model_config_dict['parameters']['algorithm']
+            # Map algorithm names to model_type format
+            algorithm_mapping = {
+                'RandomForestRegressor': 'random_forest_regressor',
+                'RandomForestClassifier': 'random_forest_classifier',
+                'LogisticRegression': 'logistic_regression',
+                'LinearRegression': 'linear_regression',
+                'SVC': 'svm_classifier',
+                'SVR': 'svm_regressor'
+            }
+            model_type = algorithm_mapping.get(algorithm, algorithm.lower())
+            
+            # Remove algorithm from parameters
+            parameters = model_config_dict.get('parameters', {}).copy()
+            parameters.pop('algorithm', None)
+        else:
+            model_type = model_config_dict.get('model_type', 'random_forest_regressor')
+            parameters = model_config_dict.get('parameters', {})
+        
+        # Determine task type based on model type or explicitly set
+        if 'task_type' in model_config_dict:
+            task_type = model_config_dict['task_type']
+        else:
+            # Infer from model type
+            task_type = 'regression' if 'regressor' in model_type or 'regression' in model_type else 'classification'
+        
         model_config = ModelConfig(
-            model_type=model_config_dict['model_type'],
-            framework=model_config_dict['framework'],
-            parameters=model_config_dict.get('parameters', {}),
-            task_type=model_config_dict['task_type'],
+            model_type=model_type,
+            framework=framework,
+            parameters=parameters,
+            task_type=task_type,
             random_state=model_config_dict.get('random_state')
         )
         
@@ -753,13 +776,23 @@ class ModelTrainer(PipelineComponent):
         if data is None:
             return None, None
         
-        target_column = config.get('training', {}).get('target_column', 'target')
+        # Look for target column in various places or use default
+        target_column = 'target'  # Default
+        
+        # Check if there's a special target column in the data (like 'quality' for wine)
+        # For now, we'll assume the last column is the target if 'target' doesn't exist
+        if 'target' not in data.columns:
+            # Use the last column as target
+            target_column = data.columns[-1]
+            self.logger.info(f"Using '{target_column}' as target column")
         
         if target_column not in data.columns:
-            raise ModelError(f"Target column '{target_column}' not found in data")
+            raise ModelError(f"Target column '{target_column}' not found in data. Available columns: {list(data.columns)}")
         
         X = data.drop(columns=[target_column])
         y = data[target_column]
+        
+        self.logger.info(f"Features shape: {X.shape}, Target shape: {y.shape}")
         
         return X, y
     

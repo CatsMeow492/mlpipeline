@@ -135,13 +135,16 @@ class DataPreprocessor(PipelineComponent):
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate preprocessing configuration."""
         try:
-            preprocessing_config = config.get('preprocessing', {})
+            data_config = config.get('data', {})
+            preprocessing_steps = data_config.get('preprocessing', [])
             
-            if 'steps' not in preprocessing_config:
+
+            
+            if not preprocessing_steps:
                 self.logger.error("No preprocessing steps specified")
                 return False
             
-            steps = preprocessing_config['steps']
+            steps = preprocessing_steps
             if not isinstance(steps, list) or len(steps) == 0:
                 self.logger.error("Preprocessing steps must be a non-empty list")
                 return False
@@ -151,27 +154,15 @@ class DataPreprocessor(PipelineComponent):
                     self.logger.error(f"Step {i} must be a dictionary")
                     return False
                 
-                if 'name' not in step:
-                    self.logger.error(f"Step {i} missing 'name' field")
+                if 'type' not in step:
+                    self.logger.error(f"Step {i} missing 'type' field")
                     return False
                 
-                if 'transformer' not in step and 'custom_function' not in step:
-                    self.logger.error(f"Step {i} must specify either 'transformer' or 'custom_function'")
+                # For the current schema, we use 'type' instead of 'transformer'
+                step_type = step['type']
+                if step_type not in self.transformer_registry:
+                    self.logger.error(f"Unknown transformer: {step_type}")
                     return False
-                
-                # Validate transformer exists
-                if 'transformer' in step:
-                    transformer_name = step['transformer']
-                    if transformer_name not in self.transformer_registry:
-                        self.logger.error(f"Unknown transformer: {transformer_name}")
-                        return False
-                
-                # Validate custom function exists
-                if 'custom_function' in step:
-                    func_name = step['custom_function']
-                    if func_name not in self.custom_functions:
-                        self.logger.error(f"Unknown custom function: {func_name}")
-                        return False
             
             return True
             
@@ -181,9 +172,8 @@ class DataPreprocessor(PipelineComponent):
     
     def setup(self, context: ExecutionContext) -> None:
         """Setup preprocessing pipeline from configuration."""
-        config = context.config.get('data', {})
-        
-        if not self.validate_config(config):
+        # Pass the entire config to validate_config, not just the data section
+        if not self.validate_config(context.config):
             raise ConfigurationError("Invalid preprocessing configuration")
         
         self.logger.info("Setting up data preprocessing pipeline")
@@ -195,15 +185,16 @@ class DataPreprocessor(PipelineComponent):
             input_data = self._load_input_data(context)
             
             # Get preprocessing configuration
-            preprocessing_config = context.config.get('data', {}).get('preprocessing', {})
+            data_config = context.config.get('data', {})
+            preprocessing_steps = data_config.get('preprocessing', [])
             
             # Build preprocessing pipeline
-            pipeline = self._build_pipeline(preprocessing_config, input_data)
+            pipeline = self._build_pipeline(preprocessing_steps, input_data)
             
             # Split data if requested
             train_data, val_data, test_data = self._split_data(
                 input_data, 
-                preprocessing_config.get('data_split', {})
+                data_config
             )
             
             # Fit pipeline on training data
@@ -256,7 +247,7 @@ class DataPreprocessor(PipelineComponent):
             
             # Create and save preprocessing metadata
             metadata = self._create_metadata(
-                preprocessing_config, 
+                preprocessing_steps, 
                 input_data, 
                 pipeline,
                 transformed_datasets
@@ -290,7 +281,7 @@ class DataPreprocessor(PipelineComponent):
                     'original_shape': input_data['features'].shape,
                     'transformed_shape': transformed_datasets['train'].shape if 'train' in transformed_datasets else None,
                     'feature_names': list(feature_names),
-                    'preprocessing_steps': len(preprocessing_config.get('steps', []))
+                    'preprocessing_steps': len(preprocessing_steps)
                 }
             )
             
@@ -323,7 +314,7 @@ class DataPreprocessor(PipelineComponent):
         
         return {'features': df}
     
-    def _build_pipeline(self, config: Dict[str, Any], input_data: Dict[str, pd.DataFrame]) -> Pipeline:
+    def _build_pipeline(self, preprocessing_steps: List[Dict[str, Any]], input_data: Dict[str, pd.DataFrame]) -> Pipeline:
         """Build scikit-learn preprocessing pipeline from configuration."""
         df = input_data['features']
         
@@ -331,92 +322,61 @@ class DataPreprocessor(PipelineComponent):
         transformers = []
         passthrough_columns = set(df.columns)
         
-        for step_config in config.get('steps', []):
-            step_name = step_config['name']
+        for i, step_config in enumerate(preprocessing_steps):
+            step_name = step_config.get('name', f"step_{i}")
+            step_type = step_config['type']
             
-            if 'transformer' in step_config and step_config['transformer']:
-                # Built-in transformer
-                transformer_name = step_config['transformer']
-                transformer_class = self.transformer_registry[transformer_name]
-                transformer_params = step_config.get('parameters', {})
+            # Built-in transformer
+            transformer_name = step_type
+            transformer_class = self.transformer_registry[transformer_name]
+            transformer_params = step_config.get('parameters', {})
+            
+            # Handle column-specific transformers
+            columns = step_config.get('columns')
+            if columns:
+                # Validate columns exist in the dataframe
+                valid_columns = [col for col in columns if col in df.columns]
+                if not valid_columns:
+                    self.logger.warning(f"No valid columns found for transformer {step_name}, skipping")
+                    continue
                 
-                # Handle column-specific transformers
-                columns = step_config.get('columns')
-                if columns:
-                    # Validate columns exist in the dataframe
-                    valid_columns = [col for col in columns if col in df.columns]
-                    if not valid_columns:
-                        self.logger.warning(f"No valid columns found for transformer {step_name}, skipping")
-                        continue
-                    
-                    # Create transformer for specific columns
-                    transformer = transformer_class(**transformer_params)
-                    transformers.append((step_name, transformer, valid_columns))
-                    
-                    # Remove these columns from passthrough
-                    passthrough_columns -= set(valid_columns)
-                    
-                else:
-                    # Apply to all columns - but some transformers only work with numerical data
-                    if transformer_name in ['standard_scaler', 'min_max_scaler', 'robust_scaler', 
-                                          'max_abs_scaler', 'power_transformer', 'quantile_transformer',
-                                          'normalizer', 'select_k_best', 'select_percentile', 'variance_threshold']:
-                        # These transformers only work with numerical data
-                        numerical_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-                        if numerical_columns:
-                            transformer = transformer_class(**transformer_params)
-                            transformers.append((step_name, transformer, numerical_columns))
-                            
-                            # Remove these columns from passthrough
-                            passthrough_columns -= set(numerical_columns)
-                        else:
-                            self.logger.warning(f"No numerical columns found for transformer {step_name}, skipping")
-                            continue
-                    else:
-                        # Apply to all columns
-                        all_columns = df.columns.tolist()
+                # Create transformer for specific columns
+                transformer = transformer_class(**transformer_params)
+                transformers.append((step_name, transformer, valid_columns))
+                
+                # Remove these columns from passthrough
+                passthrough_columns -= set(valid_columns)
+                
+            else:
+                # Apply to all columns - but some transformers only work with numerical data
+                if transformer_name in ['standard_scaler', 'min_max_scaler', 'robust_scaler', 
+                                      'max_abs_scaler', 'power_transformer', 'quantile_transformer',
+                                      'normalizer', 'select_k_best', 'select_percentile', 'variance_threshold']:
+                    # These transformers only work with numerical data
+                    numerical_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+                    if numerical_columns:
                         transformer = transformer_class(**transformer_params)
-                        transformers.append((step_name, transformer, all_columns))
+                        transformers.append((step_name, transformer, numerical_columns))
                         
-                        # Remove all columns from passthrough
-                        passthrough_columns = set()
-                
-            elif 'custom_function' in step_config:
-                # Custom function
-                func_name = step_config['custom_function']
-                func = self.custom_functions[func_name]
-                func_params = step_config.get('parameters', {})
-                
-                transformer = CustomTransformer(func, func_name, **func_params)
-                
-                # Handle column-specific custom functions
-                columns = step_config.get('columns')
-                if columns:
-                    # Validate columns exist in the dataframe
-                    valid_columns = [col for col in columns if col in df.columns]
-                    if not valid_columns:
-                        self.logger.warning(f"No valid columns found for custom function {step_name}, skipping")
+                        # Remove these columns from passthrough
+                        passthrough_columns -= set(numerical_columns)
+                    else:
+                        self.logger.warning(f"No numerical columns found for transformer {step_name}, skipping")
                         continue
-                    
-                    transformers.append((step_name, transformer, valid_columns))
-                    
-                    # Remove these columns from passthrough
-                    passthrough_columns -= set(valid_columns)
                 else:
                     # Apply to all columns
                     all_columns = df.columns.tolist()
+                    transformer = transformer_class(**transformer_params)
                     transformers.append((step_name, transformer, all_columns))
                     
                     # Remove all columns from passthrough
                     passthrough_columns = set()
-            else:
-                self.logger.warning(f"Invalid step configuration for {step_name}, skipping")
-                continue
         
         # Create the pipeline
         if transformers:
             # Create a single ColumnTransformer with all transformations
-            remainder = 'passthrough' if passthrough_columns else 'drop'
+            # Always drop untransformed columns (like Name, Ticket, Cabin for Titanic)
+            remainder = 'drop'
             column_transformer = ColumnTransformer(
                 transformers=transformers,
                 remainder=remainder,
@@ -432,17 +392,17 @@ class DataPreprocessor(PipelineComponent):
         
         return pipeline
     
-    def _split_data(self, input_data: Dict[str, pd.DataFrame], split_config: Dict[str, Any]) -> Tuple[Dict, Dict, Dict]:
+    def _split_data(self, input_data: Dict[str, pd.DataFrame], data_config: Dict[str, Any]) -> Tuple[Dict, Dict, Dict]:
         """Split data into train/validation/test sets."""
         df = input_data['features']
         
         # Get split configuration
-        train_size = split_config.get('train_size', 0.7)
-        val_size = split_config.get('val_size', 0.15)
-        test_size = split_config.get('test_size', 0.15)
-        random_state = split_config.get('random_state', 42)
-        stratify_column = split_config.get('stratify_column')
-        target_column = split_config.get('target_column')
+        train_size = data_config.get('train_split', 0.7)
+        val_size = data_config.get('validation_split', 0.15)
+        test_size = data_config.get('test_split', 0.15)
+        random_state = data_config.get('random_state', 42)
+        stratify_enabled = data_config.get('stratify', False)
+        target_column = None  # We'll identify the target column ourselves
         
         # Validate split sizes
         total_size = train_size + val_size + test_size
@@ -459,9 +419,7 @@ class DataPreprocessor(PipelineComponent):
         
         # Prepare stratification
         stratify = None
-        if stratify_column and stratify_column in df.columns:
-            stratify = df[stratify_column]
-        elif target is not None and split_config.get('stratify', False):
+        if target is not None and stratify_enabled:
             stratify = target
         
         # First split: separate test set
@@ -535,7 +493,7 @@ class DataPreprocessor(PipelineComponent):
         
         return train_data, val_data, test_data
     
-    def _create_metadata(self, config: Dict[str, Any], input_data: Dict[str, pd.DataFrame], 
+    def _create_metadata(self, preprocessing_steps: List[Dict[str, Any]], input_data: Dict[str, pd.DataFrame], 
                         pipeline: Pipeline, transformed_data: Dict[str, pd.DataFrame]) -> PreprocessingMetadata:
         """Create preprocessing metadata for inference consistency."""
         df = input_data['features']
@@ -555,21 +513,20 @@ class DataPreprocessor(PipelineComponent):
             'data_types': df.dtypes.astype(str).to_dict()
         }
         
-        # Get target column from config
-        target_column = config.get('data_split', {}).get('target_column')
-        feature_columns = [col for col in df.columns if col != target_column]
+        # For now, assume no target column separation (will be handled in training)
+        target_column = None  # We'll let the training component handle target column separation
+        feature_columns = df.columns.tolist()
         
-        # Filter out target column from numerical columns if it exists
-        if target_column and target_column in numerical_columns:
-            numerical_columns = [col for col in numerical_columns if col != target_column]
-        
-        # Create preprocessing steps with proper handling of custom functions
+        # Create preprocessing steps metadata
         steps_metadata = []
-        for step in config.get('steps', []):
-            step_dict = step.copy()
-            # Ensure transformer field exists for PreprocessingStep
-            if 'transformer' not in step_dict and 'custom_function' in step_dict:
-                step_dict['transformer'] = ''  # Empty string for custom functions
+        for i, step in enumerate(preprocessing_steps):
+            step_dict = {
+                'name': step.get('name', f'step_{i}'),
+                'transformer': step['type'],
+                'columns': step.get('columns'),
+                'parameters': step.get('parameters', {}),
+                'custom_function': None
+            }
             steps_metadata.append(asdict(PreprocessingStep(**step_dict)))
         
         metadata = PreprocessingMetadata(

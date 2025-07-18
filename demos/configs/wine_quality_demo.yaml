@@ -8,7 +8,9 @@ pipeline:
 data:
   sources:
     - type: csv
-      path: "demos/data/wine_quality_red.csv"
+      path: "data/wine_quality_red.csv"
+      options:
+        separator: ";"
   
   preprocessing:
     - type: standard_scaler
@@ -29,7 +31,6 @@ model:
     n_estimators: 100
     max_depth: 10
     random_state: 42
-  
   hyperparameter_tuning:
     method: optuna
     n_trials: 15

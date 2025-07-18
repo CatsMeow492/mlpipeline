@@ -44,6 +44,7 @@ class DataSourceConfig(BaseModel):
     connection_string: Optional[str] = Field(None, description="Database connection string")
     table_name: Optional[str] = Field(None, description="Table name for SQL sources")
     query: Optional[str] = Field(None, description="SQL query for data extraction")
+    options: Dict[str, Any] = Field(default_factory=dict, description="Source-specific options (e.g., CSV separator)")
     
     @model_validator(mode='after')
     def validate_sql_config(self):

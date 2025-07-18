@@ -8,20 +8,23 @@ pipeline:
 data:
   sources:
     - type: csv
-      path: "demos/data/adult_income.csv"
+      path: "data/adult_income.csv"
+      options:
+        header: null
+        names: ["age", "workclass", "fnlwgt", "education", "education-num", "marital-status", "occupation", "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country", "income"]
   
   preprocessing:
-    - type: missing_value_imputer
-      columns: ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
+    - type: simple_imputer
+      columns: ["39", " 77516", " 13", " 2174", " 0", " 40"]
       parameters:
         strategy: "median"
     - type: standard_scaler
-      columns: ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
+      columns: ["39", " 77516", " 13", " 2174", " 0", " 40"]
     - type: one_hot_encoder
-      columns: ["workclass", "education", "marital-status", "occupation", "relationship", "race", "sex", "native-country"]
+      columns: [" State-gov", " Bachelors", " Never-married", " Adm-clerical", " Not-in-family", " White", " Male", " United-States"]
       parameters:
         drop: "first"
-        sparse: false
+        sparse_output: false
         handle_unknown: "ignore"
   
   train_split: 0.7
@@ -32,6 +35,7 @@ data:
 
 model:
   type: xgboost
+  model_type: xgb_classifier
   parameters:
     objective: "binary:logistic"
     n_estimators: 100

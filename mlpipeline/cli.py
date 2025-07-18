@@ -1142,15 +1142,25 @@ def _display_drift_results(result):
 
 def _create_training_stages(config, orchestrator):
     """Create training pipeline stages from configuration."""
-    # This is a placeholder - in a real implementation, this would
-    # create actual pipeline stages based on the configuration
     from .core.interfaces import PipelineStage
+    from .data.ingestion import DataIngestionEngine
+    from .data.preprocessing import DataPreprocessor
+    from .models.training import ModelTrainer
+    from .models.evaluation import ModelEvaluator
+    
+    # Create components with real implementations
+    data_ingestion = DataIngestionEngine()
+    data_preprocessor = DataPreprocessor()
+    model_trainer = ModelTrainer()
+    
+    # Create evaluator
+    model_evaluator = ModelEvaluator()
     
     stages = [
-        PipelineStage(name="data_ingestion", components=[]),
-        PipelineStage(name="data_preprocessing", components=[], dependencies=["data_ingestion"]),
-        PipelineStage(name="model_training", components=[], dependencies=["data_preprocessing"]),
-        PipelineStage(name="model_evaluation", components=[], dependencies=["model_training"])
+        PipelineStage(name="data_ingestion", components=[data_ingestion]),
+        PipelineStage(name="data_preprocessing", components=[data_preprocessor], dependencies=["data_ingestion"]),
+        PipelineStage(name="model_training", components=[model_trainer], dependencies=["data_preprocessing"]),
+        PipelineStage(name="model_evaluation", components=[model_evaluator], dependencies=["model_training"])
     ]
     
     return stages
@@ -1159,11 +1169,19 @@ def _create_training_stages(config, orchestrator):
 def _create_inference_stages(config, orchestrator):
     """Create inference pipeline stages from configuration."""
     from .core.interfaces import PipelineStage
+    from .data.ingestion import DataIngestionEngine
+    from .data.preprocessing import DataPreprocessor
+    from .models.inference import ModelInferenceEngine
+    
+    # Create components
+    data_loader = DataIngestionEngine()
+    data_preprocessor = DataPreprocessor()
+    inference_engine = ModelInferenceEngine()
     
     stages = [
-        PipelineStage(name="data_loading", components=[]),
-        PipelineStage(name="data_preprocessing", components=[], dependencies=["data_loading"]),
-        PipelineStage(name="model_inference", components=[], dependencies=["data_preprocessing"])
+        PipelineStage(name="data_loading", components=[data_loader]),
+        PipelineStage(name="data_preprocessing", components=[data_preprocessor], dependencies=["data_loading"]),
+        PipelineStage(name="model_inference", components=[inference_engine], dependencies=["data_preprocessing"])
     ]
     
     return stages
@@ -1172,10 +1190,16 @@ def _create_inference_stages(config, orchestrator):
 def _create_evaluation_stages(config, orchestrator):
     """Create evaluation pipeline stages from configuration."""
     from .core.interfaces import PipelineStage
+    from .data.ingestion import DataIngestionEngine
+    from .models.evaluation import ModelEvaluator
+    
+    # Create components
+    data_loader = DataIngestionEngine()
+    model_evaluator = ModelEvaluator()
     
     stages = [
-        PipelineStage(name="data_loading", components=[]),
-        PipelineStage(name="model_evaluation", components=[], dependencies=["data_loading"])
+        PipelineStage(name="data_loading", components=[data_loader]),
+        PipelineStage(name="model_evaluation", components=[model_evaluator], dependencies=["data_loading"])
     ]
     
     return stages
@@ -1184,10 +1208,16 @@ def _create_evaluation_stages(config, orchestrator):
 def _create_monitoring_stages(config, orchestrator):
     """Create monitoring pipeline stages from configuration."""
     from .core.interfaces import PipelineStage
+    from .data.ingestion import DataIngestionEngine
+    from .monitoring.drift_detection import DriftDetector
+    
+    # Create components
+    data_loader = DataIngestionEngine()
+    drift_detector = DriftDetector()
     
     stages = [
-        PipelineStage(name="data_loading", components=[]),
-        PipelineStage(name="drift_detection", components=[], dependencies=["data_loading"])
+        PipelineStage(name="data_loading", components=[data_loader]),
+        PipelineStage(name="drift_detection", components=[drift_detector], dependencies=["data_loading"])
     ]
     
     return stages

@@ -8,16 +8,18 @@ pipeline:
 data:
   sources:
     - type: csv
-      path: "demos/data/telco_customer_churn.csv"
+      path: "data/telco_customer_churn.csv"
   
   preprocessing:
+    # Scale only truly numeric features (exclude TotalCharges due to string format)
     - type: standard_scaler
-      columns: ["tenure", "MonthlyCharges", "TotalCharges"]
+      columns: ["tenure", "MonthlyCharges"]
+    # Encode categorical features
     - type: one_hot_encoder
       columns: ["gender", "Partner", "Dependents", "InternetService", "Contract", "PaymentMethod"]
       parameters:
         drop: "first"
-        sparse: false
+        sparse_output: false
   
   train_split: 0.7
   validation_split: 0.15
