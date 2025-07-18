@@ -134,4 +134,4 @@ Thumbs.db
 config_local.yaml
 config_prod.yaml
 .env.local
-.env.production
+.env.productiondemos/artifacts/

@@ -1,0 +1,64 @@
+# Telco Customer Churn Classification Demo
+pipeline:
+  name: "telco_churn_classification_demo"
+  description: "Predict customer churn using telecom customer data"
+  tags: ["demo", "classification", "churn", "telecom"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "data/telco_customer_churn.csv"
+  
+  preprocessing:
+    # Scale only truly numeric features (exclude TotalCharges due to string format)
+    - type: standard_scaler
+      columns: ["tenure", "MonthlyCharges"]
+    # Encode categorical features
+    - type: one_hot_encoder
+      columns: ["gender", "Partner", "Dependents", "InternetService", "Contract", "PaymentMethod"]
+      parameters:
+        drop: "first"
+        sparse_output: false
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true
+  random_state: 42
+
+model:
+  type: sklearn
+  parameters:
+    algorithm: RandomForestClassifier
+    n_estimators: 100
+    max_depth: 10
+    random_state: 42
+    class_weight: "balanced"
+  
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 20
+    timeout: 900
+    parameters:
+      n_estimators: [50, 100, 200]
+      max_depth: [5, 10, 15]
+    cv_folds: 3
+    scoring: "f1"
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 3
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "feature_importance"]
+
+drift_detection:
+  enabled: false
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/telco_churn_demo.log"

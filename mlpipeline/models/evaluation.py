@@ -105,7 +105,20 @@ class ModelEvaluator(PipelineComponent):
             }
             
             metrics = eval_config.get('metrics', [])
-            task_type = config.get('training', {}).get('model', {}).get('task_type', 'classification')
+            
+            # Get task type from model configuration or infer from model type
+            model_config = config.get('model', {})
+            task_type = model_config.get('task_type')
+            
+            if not task_type:
+                # Infer from model type
+                model_type = model_config.get('model_type', '')
+                if not model_type:
+                    # Try to infer from algorithm parameter (for backwards compatibility)
+                    algorithm = model_config.get('parameters', {}).get('algorithm', '')
+                    model_type = algorithm.lower()
+                
+                task_type = 'regression' if 'regressor' in model_type or 'regression' in model_type else 'classification'
             
             if task_type == 'classification':
                 valid_metrics = valid_classification_metrics
@@ -216,32 +229,66 @@ class ModelEvaluator(PipelineComponent):
         # Get artifacts path from context
         artifacts_path = Path(context.artifacts_path)
         
-        # Look for model files in artifacts directory
-        model_files = list(artifacts_path.glob("*_model.pkl"))
+        # Look for model files in artifacts directory (support multiple formats)
+        model_files = (
+            list(artifacts_path.glob("*_model.pkl")) +
+            list(artifacts_path.glob("*_model.joblib")) + 
+            list(artifacts_path.glob("trained_model.joblib")) +
+            list(artifacts_path.glob("trained_model.pkl"))
+        )
         
         if not model_files:
             raise ModelError("No trained models found in artifacts directory")
         
         for model_file in model_files:
-            model_name = model_file.stem.replace("_model", "")
+            model_name = model_file.stem.replace("_model", "").replace("trained_", "")
+            if not model_name:
+                model_name = "main"
             
             try:
-                # Load model
-                with open(model_file, 'rb') as f:
-                    model = pickle.load(f)
+                # Load model based on file extension
+                if model_file.suffix == '.joblib':
+                    import joblib
+                    model = joblib.load(model_file)
+                else:
+                    with open(model_file, 'rb') as f:
+                        model = pickle.load(f)
                 
-                # Load test data
-                test_data_file = artifacts_path / f"{model_name}_test_data.pkl"
+                # Load test data from parquet files (new format)
+                test_data_file = artifacts_path / "test_preprocessed.parquet"
                 if test_data_file.exists():
-                    with open(test_data_file, 'rb') as f:
-                        test_data = pickle.load(f)
+                    import pandas as pd
+                    test_data_df = pd.read_parquet(test_data_file)
+                    
+                    # Split features and target (assume last column is target)
+                    if 'quality' in test_data_df.columns:
+                        target_col = 'quality'
+                    elif 'target' in test_data_df.columns:
+                        target_col = 'target'
+                    else:
+                        target_col = test_data_df.columns[-1]
+                    
+                    X_test = test_data_df.drop(columns=[target_col])
+                    y_test = test_data_df[target_col]
+                    
+                    # Get task type from model config
+                    model_config_file = artifacts_path / "model_config.json"
+                    task_type = 'classification'  # default
+                    if model_config_file.exists():
+                        import json
+                        with open(model_config_file, 'r') as f:
+                            model_config = json.load(f)
+                            task_type = model_config.get('task_type', 'classification')
                     
                     models_data[model_name] = {
                         'model': model,
-                        'X_test': test_data['X_test'],
-                        'y_test': test_data['y_test'],
-                        'task_type': test_data.get('task_type', 'classification')
+                        'X_test': X_test,
+                        'y_test': y_test,
+                        'task_type': task_type
                     }
+                    
+                    self.logger.info(f"Loaded model '{model_name}' with test data: {X_test.shape} features, {y_test.shape} targets, task: {task_type}")
+                    
                 else:
                     self.logger.warning(f"Test data not found for model {model_name}")
                     

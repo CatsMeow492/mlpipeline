@@ -1,0 +1,106 @@
+# Titanic Survival Prediction Demo  
+# Demonstrates: Feature engineering, missing value handling, mixed data types, classification
+
+pipeline:
+  name: "titanic_survival_demo"
+  description: "Predict passenger survival on the Titanic using passenger information"
+  tags: ["demo", "classification", "titanic", "feature-engineering"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "demos/data/titanic.csv"
+  
+  preprocessing:
+    # Handle missing values in Age (many passengers have missing ages)
+    - type: missing_value_imputer
+      columns: ["Age"]
+      parameters:
+        strategy: "median"
+    
+    # Handle missing values in Fare (few missing values)
+    - type: missing_value_imputer
+      columns: ["Fare"]
+      parameters:
+        strategy: "median"
+    
+    # Handle missing values in Embarked (few missing values)
+    - type: missing_value_imputer
+      columns: ["Embarked"]
+      parameters:
+        strategy: "most_frequent"
+    
+    # Standardize numerical features
+    - type: standard_scaler
+      columns: ["Age", "Fare", "SibSp", "Parch"]
+    
+    # Encode categorical features
+    - type: one_hot_encoder
+      columns: ["Sex", "Embarked", "Pclass"]
+      parameters:
+        drop: "first"
+        sparse: false
+    
+    # Note: We'll drop columns like PassengerId, Name, Ticket, Cabin in preprocessing
+    # as they are not useful for prediction (high cardinality or unique identifiers)
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true  # Important for survival prediction (binary classification)
+  random_state: 42
+
+model:
+  type: sklearn
+  parameters:
+    algorithm: RandomForestClassifier
+    n_estimators: 150
+    max_depth: 8
+    min_samples_split: 5
+    min_samples_leaf: 2
+    random_state: 42
+    class_weight: "balanced"
+  
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 30
+    timeout: 900  # 15 minutes (smaller dataset, less time needed)
+    parameters:
+      n_estimators: [50, 100, 150, 200]
+      max_depth: [5, 8, 10, 12]
+      min_samples_split: [2, 5, 10]
+      min_samples_leaf: [1, 2, 4]
+      max_features: ["sqrt", "log2"]
+    cv_folds: 5
+    scoring: "accuracy"  # Good metric for this balanced problem
+  
+  early_stopping: false
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 5
+  stratify: true
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "precision_recall_curve", "feature_importance"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "demos/data/titanic.csv"
+  methods: ["evidently"]
+  thresholds:
+    data_drift: 0.1
+    prediction_drift: 0.05
+  monitoring_window: 200
+  alert_channels:
+    - "email:titanic-ml-team@historical-analysis.com"
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/titanic_survival_demo.log"
+  max_file_size: "50MB"
+  backup_count: 3 

@@ -1,0 +1,59 @@
+# Wine Quality Regression Demo
+pipeline:
+  name: "wine_quality_regression_demo"
+  description: "Predict wine quality score using physicochemical properties"
+  tags: ["demo", "regression", "wine", "quality-prediction"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "data/wine_quality_red.csv"
+      options:
+        separator: ";"
+  
+  preprocessing:
+    - type: standard_scaler
+      columns: ["fixed acidity", "volatile acidity", "citric acid", "residual sugar",
+                "chlorides", "free sulfur dioxide", "total sulfur dioxide", "density",
+                "pH", "sulphates", "alcohol"]
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: false
+  random_state: 42
+
+model:
+  type: sklearn
+  parameters:
+    algorithm: RandomForestRegressor
+    n_estimators: 100
+    max_depth: 10
+    random_state: 42
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 15
+    timeout: 600
+    parameters:
+      n_estimators: [50, 100, 150]
+      max_depth: [5, 10, 15]
+    cv_folds: 3
+    scoring: "neg_mean_squared_error"
+
+evaluation:
+  metrics: ["mse", "mae", "rmse", "r2_score"]
+  cross_validation: true
+  cv_folds: 3
+  generate_plots: true
+  plot_types: ["residuals", "prediction_vs_actual", "feature_importance"]
+
+drift_detection:
+  enabled: false
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/wine_quality_demo.log"

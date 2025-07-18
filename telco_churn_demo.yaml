@@ -1,0 +1,96 @@
+# Telco Customer Churn Classification Demo
+# Demonstrates: Binary classification, feature engineering, hyperparameter tuning, drift detection
+
+pipeline:
+  name: "telco_churn_classification_demo"
+  description: "Predict customer churn using telecom customer data"
+  tags: ["demo", "classification", "churn", "telecom"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "demos/data/telco_customer_churn.csv"
+  
+  preprocessing:
+    # Standardize numerical features
+    - type: standard_scaler
+      columns: ["tenure", "MonthlyCharges", "TotalCharges"]
+    
+    # Handle categorical features  
+    - type: one_hot_encoder
+      columns: ["gender", "Partner", "Dependents", "PhoneService", "MultipleLines", 
+                "InternetService", "OnlineSecurity", "OnlineBackup", "DeviceProtection",
+                "TechSupport", "StreamingTV", "StreamingMovies", "Contract", 
+                "PaperlessBilling", "PaymentMethod"]
+      parameters:
+        drop: "first"
+        sparse: false
+    
+    # Handle missing values in TotalCharges (some are empty strings)
+    - type: missing_value_imputer
+      columns: ["TotalCharges"]
+      parameters:
+        strategy: "median"
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true  # Important for imbalanced churn data
+  random_state: 42
+
+model:
+  type: sklearn
+  parameters:
+    algorithm: RandomForestClassifier
+    n_estimators: 200
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 2
+    random_state: 42
+    class_weight: "balanced"  # Handle class imbalance
+  
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 50
+    timeout: 1800  # 30 minutes
+    parameters:
+      n_estimators: [100, 200, 300, 500]
+      max_depth: [5, 10, 15, 20]
+      min_samples_split: [2, 5, 10]
+      min_samples_leaf: [1, 2, 4]
+      max_features: ["sqrt", "log2", 0.8]
+    cv_folds: 5
+    scoring: "f1"  # Good metric for imbalanced classes
+  
+  early_stopping: false
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 5
+  stratify: true
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "precision_recall_curve", "feature_importance"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "demos/data/telco_customer_churn.csv"
+  methods: ["evidently"]
+  thresholds:
+    data_drift: 0.1
+    prediction_drift: 0.05
+    feature_drift: 0.15
+  monitoring_window: 500
+  alert_channels:
+    - "email:ml-team@company.com"
+    - "slack:#churn-alerts"
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/telco_churn_demo.log"
+  max_file_size: "50MB"
+  backup_count: 3 
