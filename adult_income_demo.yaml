@@ -1,0 +1,102 @@
+# Adult Income Prediction Demo
+# Demonstrates: Large dataset handling, complex categorical encoding, income prediction
+
+pipeline:
+  name: "adult_income_prediction_demo"
+  description: "Predict whether income exceeds $50K using census data"
+  tags: ["demo", "classification", "income", "census", "large-dataset"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "demos/data/adult_income.csv"
+  
+  preprocessing:
+    # Handle missing values (marked as '?' in this dataset)
+    - type: missing_value_imputer
+      columns: ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
+      parameters:
+        strategy: "median"
+    
+    - type: missing_value_imputer
+      columns: ["workclass", "education", "marital-status", "occupation", "relationship", 
+                "race", "sex", "native-country"]
+      parameters:
+        strategy: "most_frequent"
+    
+    # Standardize numerical features
+    - type: standard_scaler
+      columns: ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
+    
+    # Encode categorical features (many categories in this dataset)
+    - type: one_hot_encoder
+      columns: ["workclass", "education", "marital-status", "occupation", "relationship", 
+                "race", "sex", "native-country"]
+      parameters:
+        drop: "first"
+        sparse: false
+        handle_unknown: "ignore"  # Important for unseen categories
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true  # Income prediction is often imbalanced
+  random_state: 42
+
+model:
+  type: xgboost  # XGBoost often works well for structured data with many features
+  parameters:
+    objective: "binary:logistic"
+    n_estimators: 300
+    max_depth: 8
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+    eval_metric: "logloss"
+  
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 50
+    timeout: 2400  # 40 minutes (larger dataset needs more time)
+    parameters:
+      n_estimators: [200, 300, 500]
+      max_depth: [6, 8, 10]
+      learning_rate: [0.05, 0.1, 0.15, 0.2]
+      subsample: [0.7, 0.8, 0.9]
+      colsample_bytree: [0.7, 0.8, 0.9]
+    cv_folds: 5
+    scoring: "roc_auc"  # Good metric for binary classification
+  
+  early_stopping: true
+  early_stopping_patience: 20
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 5
+  stratify: true
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "precision_recall_curve", "feature_importance"]
+
+drift_detection:
+  enabled: true
+  baseline_data: "demos/data/adult_income.csv"
+  methods: ["evidently"]
+  thresholds:
+    data_drift: 0.1
+    prediction_drift: 0.05
+  monitoring_window: 1000
+  alert_channels:
+    - "email:census-ml-team@bureau.gov"
+    - "slack:#income-prediction-alerts"
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/adult_income_demo.log"
+  max_file_size: "100MB"  # Larger log file for larger dataset
+  backup_count: 5 

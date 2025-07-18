@@ -1,0 +1,65 @@
+# Titanic Survival Prediction Demo
+pipeline:
+  name: "titanic_survival_demo"
+  description: "Predict passenger survival on the Titanic"
+  tags: ["demo", "classification", "titanic", "feature-engineering"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "demos/data/titanic.csv"
+  
+  preprocessing:
+    - type: missing_value_imputer
+      columns: ["Age", "Fare"]
+      parameters:
+        strategy: "median"
+    - type: standard_scaler
+      columns: ["Age", "Fare", "SibSp", "Parch"]
+    - type: one_hot_encoder
+      columns: ["Sex", "Embarked", "Pclass"]
+      parameters:
+        drop: "first"
+        sparse: false
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true
+  random_state: 42
+
+model:
+  type: sklearn
+  parameters:
+    algorithm: RandomForestClassifier
+    n_estimators: 100
+    max_depth: 8
+    random_state: 42
+  
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 15
+    timeout: 600
+    parameters:
+      n_estimators: [50, 100, 150]
+      max_depth: [5, 8, 10]
+    cv_folds: 3
+    scoring: "accuracy"
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 3
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "feature_importance"]
+
+drift_detection:
+  enabled: false
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/titanic_survival_demo.log"

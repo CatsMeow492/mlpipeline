@@ -1,0 +1,68 @@
+# Adult Income Prediction Demo
+pipeline:
+  name: "adult_income_prediction_demo"
+  description: "Predict whether income exceeds $50K using census data"
+  tags: ["demo", "classification", "income", "census"]
+  mlflow_tracking_uri: "http://localhost:5000"
+
+data:
+  sources:
+    - type: csv
+      path: "demos/data/adult_income.csv"
+  
+  preprocessing:
+    - type: missing_value_imputer
+      columns: ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
+      parameters:
+        strategy: "median"
+    - type: standard_scaler
+      columns: ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
+    - type: one_hot_encoder
+      columns: ["workclass", "education", "marital-status", "occupation", "relationship", "race", "sex", "native-country"]
+      parameters:
+        drop: "first"
+        sparse: false
+        handle_unknown: "ignore"
+  
+  train_split: 0.7
+  validation_split: 0.15
+  test_split: 0.15
+  stratify: true
+  random_state: 42
+
+model:
+  type: xgboost
+  parameters:
+    objective: "binary:logistic"
+    n_estimators: 100
+    max_depth: 6
+    learning_rate: 0.1
+    random_state: 42
+  
+  hyperparameter_tuning:
+    method: optuna
+    n_trials: 20
+    timeout: 1200
+    parameters:
+      n_estimators: [100, 200]
+      max_depth: [4, 6, 8]
+      learning_rate: [0.1, 0.15]
+    cv_folds: 3
+    scoring: "roc_auc"
+
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1_score", "roc_auc"]
+  cross_validation: true
+  cv_folds: 3
+  generate_plots: true
+  plot_types: ["confusion_matrix", "roc_curve", "feature_importance"]
+
+drift_detection:
+  enabled: false
+
+few_shot:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "demos/results/adult_income_demo.log"
